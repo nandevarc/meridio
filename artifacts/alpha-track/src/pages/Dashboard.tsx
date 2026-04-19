@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Project, ProjectStatus, Priority, PlayStatus, STATUS_ORDER, STATUS_STYLES, PRIORITY_COLORS, PLAY_STATUS_COLORS } from "../types";
-import { getProjects, updateProject, deleteProject, saveProjects, formatDate, formatDateTime } from "../utils/storage";
+import {
+  Project, ProjectStatus, Priority, TimingWindow,
+  STATUS_ORDER, STATUS_STYLES, PRIORITY_COLORS, PLAY_STATUS_COLORS,
+  VERDICT_STYLES, TIMING_STYLES, scoreColor, computeQuickScore,
+} from "../types";
+import { getProjects, updateProject, deleteProject, saveProjects, formatDateTime } from "../utils/storage";
 import { useToast } from "../context/ToastContext";
 import { STORAGE_KEY } from "../types";
-import { Settings, Plus, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
-import { Select } from "../components/FormFields";
+import { Settings, Plus, ChevronDown, ExternalLink } from "lucide-react";
 
 function cycleStatus(current: ProjectStatus): ProjectStatus {
   const idx = STATUS_ORDER.indexOf(current);
@@ -21,6 +24,34 @@ function sortProjects(projects: Project[]): Project[] {
   });
 }
 
+function generateShareText(project: Project): string {
+  const lines: string[] = [];
+  lines.push(`◈ ${project.name.toUpperCase()}`);
+  const meta = [
+    ...(project.chain.length ? project.chain : []),
+    ...(project.category.length ? project.category : []),
+    ...(project.stage.length ? project.stage : []),
+  ].join(" · ");
+  if (meta) lines.push(meta);
+  lines.push("");
+  const desc = project.narrative || project.description;
+  if (desc) lines.push(desc);
+  if (project.builder) lines.push(`Builder: ${project.builder}`);
+  if (project.ctSignal) {
+    const ctPart = (project.ctCount != null && project.ctCount > 0) ? ` (${project.ctCount}×)` : "";
+    lines.push(`CT Signal: ${project.ctSignal}${ctPart}`);
+  }
+  if (project.actionRequired) lines.push(`Play: ${project.actionRequired}`);
+  if (project.playTypes.length) lines.push(`Type: ${project.playTypes.join(", ")}`);
+  if (project.timingWindow) lines.push(`Timing: ${project.timingWindow}`);
+  const qs = computeQuickScore(project);
+  if (qs !== null) lines.push(`Score: ${qs}/25`);
+  if (project.verdict) lines.push(`Verdict: ${project.verdict}`);
+  if (project.website) lines.push(project.website);
+  if (project.twitter) lines.push(project.twitter);
+  return lines.join("\n");
+}
+
 interface CardProps {
   project: Project;
   onStatusChange: (id: string, newStatus: ProjectStatus) => void;
@@ -32,35 +63,40 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [, setLocation] = useLocation();
 
+  const qs = computeQuickScore(project);
+  const isDimmed = project.verdict === "Ignore" || project.status === "Skip";
+
+  // Card visual rules
+  const isHighScore = !isDimmed && qs !== null && qs >= 18;
+  const isStrongPlay = !isDimmed && project.verdict === "Strong Play";
+  const isActiveHigh = !isDimmed && project.status === "Active Play" && project.priority === "High";
+  const isTimingNow = project.timingWindow === "Now";
+
+  // Border logic
+  let cardBorder = "1px solid var(--border)";
+  let cardBg = "var(--bg-surface)";
+  if (!isDimmed) {
+    if (isTimingNow) cardBorder = `1px solid rgba(220,38,38,0.4)`;
+    if (isHighScore) { cardBg = "#111111"; cardBorder = "1px solid #2a2a2a"; }
+  }
+
+  // Left border accent
+  let leftBorder = "";
+  const showPlayAccent = !isDimmed && (project.playStatus === "Aktif" || project.playStatus === "Segera");
+  const playAccentColor = project.playStatus === "Aktif" ? "var(--emerald)" : "var(--amber)";
+  if (!isDimmed) {
+    if (isStrongPlay) leftBorder = "3px solid #10b981";
+    if (isActiveHigh) leftBorder = "3px solid #dc2626";
+    if (!isStrongPlay && !isActiveHigh && showPlayAccent) leftBorder = `3px solid ${playAccentColor}`;
+  }
+
   const statusStyle = STATUS_STYLES[project.status];
   const priorityColor = PRIORITY_COLORS[project.priority];
-  const playStatusColor = PLAY_STATUS_COLORS[project.playStatus];
-  const showPlayAccent = project.playStatus === "Aktif" || project.playStatus === "Segera";
-  const accentColor = project.playStatus === "Aktif" ? "var(--emerald)" : "var(--amber)";
 
-  function handleShare() {
-    const lines: string[] = [];
-    lines.push(`◈ ${project.name.toUpperCase()}`);
-    const meta = [
-      ...(project.chain.length ? project.chain : []),
-      ...(project.category.length ? project.category : []),
-      ...(project.stage.length ? project.stage : []),
-    ].join(" · ");
-    if (meta) lines.push(meta);
-    const desc = project.narrative || project.description;
-    if (desc) lines.push(desc);
-    if (project.builder) lines.push(`Builder: ${project.builder}`);
-    if (project.ctSignal) lines.push(`CT Signal: ${project.ctSignal}`);
-    if (project.actionRequired) lines.push(`Play: ${project.actionRequired}`);
-    if (project.playTypes.length) lines.push(`Type: ${project.playTypes.join(", ")}`);
-    if (project.quickScore != null) lines.push(`Score: ${project.quickScore}/25`);
-    if (project.website) lines.push(project.website);
-    if (project.twitter) lines.push(project.twitter);
-
-    const text = lines.join("\n");
-    navigator.clipboard?.writeText(text).catch(() => {});
-    alert(text);
-  }
+  // Name color
+  let nameColor = "var(--text-primary)";
+  if (isDimmed) nameColor = "#52525b";
+  else if (isStrongPlay) nameColor = "#10b981";
 
   const links = [
     { key: "website", label: "web", url: project.website },
@@ -70,30 +106,41 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
     { key: "github", label: "gh", url: project.github },
   ].filter((l) => l.url);
 
+  // Action required / play notes row
+  const actionText = project.actionRequired || "";
+  const playNotesText = project.playNotes || "";
+  const showActionRow = actionText !== "" || playNotesText !== "";
+  const actionRowText = actionText || playNotesText;
+  const actionArrowColor = actionText ? "#dc2626" : "#f59e0b";
+
+  // CT row
+  const hasCTRow = !!(project.ctSignal || (project.ctCount != null && project.ctCount > 0));
+  const showPlayBadge = showPlayAccent;
+
   return (
     <div
       data-testid={`card-project-${project.id}`}
       style={{
-        background: "var(--bg-surface)",
-        border: "1px solid var(--border)",
+        background: cardBg,
+        border: cardBorder,
         borderRadius: 12,
-        borderLeft: showPlayAccent ? `3px solid ${accentColor}` : "1px solid var(--border)",
+        borderLeft: leftBorder || cardBorder,
         overflow: "hidden",
+        opacity: isDimmed ? 0.5 : 1,
+        transition: "opacity 150ms ease",
       }}
     >
-      {/* Collapsed header */}
+      {/* Clickable collapsed area */}
       <div
         onClick={() => setExpanded((e) => !e)}
-        style={{
-          padding: "12px 14px",
-          cursor: "pointer",
-          userSelect: "none",
-        }}
+        style={{ padding: "12px 14px 10px", cursor: "pointer", userSelect: "none" }}
       >
-        {/* Row 1 */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+        {/* Row 1: priority dot + timing badge + name + verdict badge + status */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7, gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+            {/* Priority dot — pulses when Active+High */}
             <div
+              className={isActiveHigh ? "pulse-red" : ""}
               style={{
                 width: 8,
                 height: 8,
@@ -102,26 +149,66 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
                 flexShrink: 0,
               }}
             />
+            {/* Timing badge */}
+            {project.timingWindow && TIMING_STYLES[project.timingWindow] && (
+              <span
+                className={project.timingWindow === "Now" ? "pulse-red" : ""}
+                style={{
+                  background: TIMING_STYLES[project.timingWindow].bg,
+                  color: TIMING_STYLES[project.timingWindow].text,
+                  border: `1px solid ${TIMING_STYLES[project.timingWindow].border}`,
+                  borderRadius: 999,
+                  padding: "1px 7px",
+                  fontSize: 10,
+                  flexShrink: 0,
+                  fontFamily: "'IBM Plex Mono', monospace",
+                }}
+              >
+                {project.timingWindow}
+              </span>
+            )}
+            {/* High score prefix */}
+            {isHighScore && (
+              <span style={{ color: "var(--text-muted)", fontSize: 12, flexShrink: 0 }}>◈</span>
+            )}
+            {/* Name */}
             <span
               className="syne"
               style={{
-                color: "var(--text-primary)",
+                color: nameColor,
                 fontWeight: 700,
                 fontSize: 14,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
+                flexShrink: 1,
               }}
             >
               {project.name}
             </span>
+            {/* Verdict badge */}
+            {project.verdict && VERDICT_STYLES[project.verdict] && (
+              <span style={{
+                background: VERDICT_STYLES[project.verdict].bg,
+                color: VERDICT_STYLES[project.verdict].text,
+                border: `1px solid ${VERDICT_STYLES[project.verdict].border}`,
+                borderRadius: 999,
+                padding: "1px 7px",
+                fontSize: 10,
+                flexShrink: 0,
+                fontFamily: "'IBM Plex Mono', monospace",
+                whiteSpace: "nowrap",
+              }}>
+                {project.verdict}
+              </span>
+            )}
           </div>
+          {/* Status badge */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              const next = cycleStatus(project.status);
-              onStatusChange(project.id, next);
+              onStatusChange(project.id, cycleStatus(project.status));
             }}
             data-testid={`status-badge-${project.id}`}
             style={{
@@ -135,7 +222,6 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
               fontFamily: "'IBM Plex Mono', monospace",
               whiteSpace: "nowrap",
               flexShrink: 0,
-              marginLeft: 8,
             }}
           >
             {project.status}
@@ -157,28 +243,64 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
           </div>
         )}
 
-        {/* Row 3 */}
-        {(project.ctSignal || showPlayAccent) && (
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            {project.ctSignal && (
-              <span style={{ fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "60%" }}>
-                <span style={{ color: "var(--text-muted)" }}>CT </span>{project.ctSignal}
+        {/* Row 3 — CT + play badge + score */}
+        {(hasCTRow || showPlayBadge || qs !== null) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {hasCTRow && (
+              <span style={{ fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "55%" }}>
+                <span style={{ color: "var(--text-muted)" }}>CT </span>
+                {project.ctSignal}
+                {project.ctCount != null && project.ctCount > 0 && (
+                  <span> · <span style={{ color: "#dc2626" }}>{project.ctCount}×</span></span>
+                )}
+                {!project.ctSignal && project.ctCount != null && project.ctCount > 0 && (
+                  <span><span style={{ color: "#dc2626" }}>{project.ctCount}×</span> mentioned</span>
+                )}
               </span>
             )}
-            {showPlayAccent && (
+            {showPlayBadge && (
               <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: playStatusColor, display: "inline-block" }} />
-                <span style={{ color: playStatusColor }}>{project.playStatus}</span>
-                {project.actionRequired && (
-                  <span style={{ color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>
-                    {project.actionRequired}
-                  </span>
-                )}
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: PLAY_STATUS_COLORS[project.playStatus], display: "inline-block" }} />
+                <span style={{ color: PLAY_STATUS_COLORS[project.playStatus] }}>{project.playStatus}</span>
+              </span>
+            )}
+            {qs !== null && (
+              <span style={{ fontSize: 11, color: scoreColor(qs), fontWeight: 600, marginLeft: "auto" }}>
+                score {qs}/25
               </span>
             )}
           </div>
         )}
       </div>
+
+      {/* Action required row — always visible if data exists */}
+      {showActionRow && (
+        <div style={{
+          background: "#111111",
+          borderTop: "1px solid #1a1a1a",
+          borderRadius: "0 0 12px 12px",
+          padding: "8px 12px",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          cursor: "pointer",
+        }}
+          onClick={() => setExpanded((e) => !e)}
+        >
+          <span style={{ color: actionArrowColor, fontSize: 13, flexShrink: 0 }}>→</span>
+          <span style={{
+            color: "var(--text-primary)",
+            fontSize: 12,
+            fontWeight: 500,
+            fontFamily: "'IBM Plex Mono', monospace",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}>
+            {actionRowText}
+          </span>
+        </div>
+      )}
 
       {/* Expanded content */}
       {expanded && (
@@ -215,13 +337,20 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
                 <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{project.playNotes}</span>
               </div>
             )}
-            {project.quickScore != null && (
-              <div style={{ color: "var(--red)", fontSize: 12 }}>score {project.quickScore}/25</div>
+            {qs !== null && (
+              <div style={{ color: scoreColor(qs), fontSize: 12, fontWeight: 600 }}>score {qs}/25</div>
             )}
             {project.source && (
               <div>
                 <span style={{ color: "var(--text-muted)", fontSize: 11 }}>source </span>
                 <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{project.source}</span>
+              </div>
+            )}
+            {/* Kill signal — only if ignore/skip */}
+            {project.reasonToDrop && (project.verdict === "Ignore" || project.status === "Skip") && (
+              <div>
+                <span style={{ color: "#dc2626", fontSize: 11 }}>kill signal </span>
+                <span style={{ color: "rgba(220,38,38,0.7)", fontSize: 12 }}>{project.reasonToDrop}</span>
               </div>
             )}
             {links.length > 0 && (
@@ -234,74 +363,25 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
                     data-testid={`link-${l.key}-${project.id}`}
-                    style={{
-                      color: "var(--blue)",
-                      fontSize: 11,
-                      textDecoration: "none",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 3,
-                    }}
+                    style={{ color: "var(--blue)", fontSize: 11, textDecoration: "none", display: "flex", alignItems: "center", gap: 3 }}
                   >
-                    <ExternalLink size={10} />
-                    {l.label}
+                    <ExternalLink size={10} />{l.label}
                   </a>
                 ))}
               </div>
             )}
-
             {/* Action buttons */}
             <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => handleShare()}
-                data-testid={`btn-share-${project.id}`}
-                style={actionBtnStyle}
-              >
-                share
-              </button>
-              <button
-                type="button"
-                onClick={() => setLocation(`/project/${project.id}/edit`)}
-                data-testid={`btn-edit-${project.id}`}
-                style={actionBtnStyle}
-              >
-                edit
-              </button>
-              <button
-                type="button"
-                onClick={() => setLocation(`/project/${project.id}`)}
-                data-testid={`btn-detail-${project.id}`}
-                style={actionBtnStyle}
-              >
-                detail
-              </button>
+              <button type="button" onClick={() => { navigator.clipboard?.writeText(generateShareText(project)).catch(() => {}); alert(generateShareText(project)); }} data-testid={`btn-share-${project.id}`} style={actionBtnStyle}>share</button>
+              <button type="button" onClick={() => setLocation(`/project/${project.id}/edit`)} data-testid={`btn-edit-${project.id}`} style={actionBtnStyle}>edit</button>
+              <button type="button" onClick={() => setLocation(`/project/${project.id}`)} data-testid={`btn-detail-${project.id}`} style={actionBtnStyle}>detail</button>
               {!confirmDelete ? (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(true)}
-                  data-testid={`btn-hapus-${project.id}`}
-                  style={{
-                    ...actionBtnStyle,
-                    background: "var(--red-dim)",
-                    color: "var(--red)",
-                    border: "1px solid #991b1b",
-                  }}
-                >
-                  hapus
-                </button>
+                <button type="button" onClick={() => setConfirmDelete(true)} data-testid={`btn-hapus-${project.id}`} style={{ ...actionBtnStyle, background: "var(--red-dim)", color: "var(--red)", border: "1px solid #991b1b" }}>hapus</button>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ color: "var(--text-secondary)", fontSize: 11 }}>Hapus {project.name}?</span>
                   <button type="button" onClick={() => setConfirmDelete(false)} style={actionBtnStyle} data-testid={`btn-batal-${project.id}`}>Batal</button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(project.id)}
-                    data-testid={`btn-confirm-hapus-${project.id}`}
-                    style={{ ...actionBtnStyle, background: "var(--red-dim)", color: "var(--red)", border: "1px solid #991b1b" }}
-                  >
-                    Hapus
-                  </button>
+                  <button type="button" onClick={() => onDelete(project.id)} data-testid={`btn-confirm-hapus-${project.id}`} style={{ ...actionBtnStyle, background: "var(--red-dim)", color: "var(--red)", border: "1px solid #991b1b" }}>Hapus</button>
                 </div>
               )}
             </div>
@@ -334,9 +414,8 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const date = new Date().toISOString().slice(0, 10);
     a.href = url;
-    a.download = `alphatrack-backup-${date}.json`;
+    a.download = `alphatrack-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
     showToast("backup berhasil");
@@ -359,9 +438,7 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
           showToast(`data diimport · ${parsed.length} project`);
           onClose();
           window.location.reload();
-        } catch {
-          alert("File tidak valid.");
-        }
+        } catch { alert("File tidak valid."); }
       };
       reader.readAsText(file);
     };
@@ -369,11 +446,7 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
   }
 
   function handleClearAll() {
-    const projects = getProjects();
-    if (!confirmClear) {
-      setConfirmClear(true);
-      return;
-    }
+    if (!confirmClear) { setConfirmClear(true); return; }
     localStorage.removeItem(STORAGE_KEY);
     showToast("semua data dihapus");
     onClose();
@@ -382,50 +455,20 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,0.6)",
-          zIndex: 100,
-        }}
-      />
-      <div
-        style={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: "var(--bg-surface)",
-          border: "1px solid var(--border)",
-          borderRadius: "16px 16px 0 0",
-          padding: 24,
-          zIndex: 101,
-          maxWidth: 480,
-          margin: "0 auto",
-        }}
-      >
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100 }} />
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: "16px 16px 0 0", padding: 24, zIndex: 101, maxWidth: 480, margin: "0 auto" }}>
         <div style={{ color: "var(--text-muted)", fontSize: 11, marginBottom: 20, textTransform: "uppercase", letterSpacing: "0.05em" }}>Settings</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <button type="button" onClick={handleBackup} data-testid="btn-backup" style={{ ...settingBtnStyle }}>
-            Backup Data (JSON)
-          </button>
-          <button type="button" onClick={handleRestore} data-testid="btn-restore" style={{ ...settingBtnStyle }}>
-            Restore Data
-          </button>
+          <button type="button" onClick={handleBackup} data-testid="btn-backup" style={settingBtnStyle}>Backup Data (JSON)</button>
+          <button type="button" onClick={handleRestore} data-testid="btn-restore" style={settingBtnStyle}>Restore Data</button>
           {!confirmClear ? (
-            <button type="button" onClick={handleClearAll} data-testid="btn-clear" style={{ ...settingBtnStyle, color: "var(--red)", fontSize: 12 }}>
-              Hapus Semua Data
-            </button>
+            <button type="button" onClick={handleClearAll} data-testid="btn-clear" style={{ ...settingBtnStyle, color: "var(--red)", fontSize: 12 }}>Hapus Semua Data</button>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>Hapus semua {getProjects().length} project?</span>
               <div style={{ display: "flex", gap: 8 }}>
                 <button type="button" onClick={() => setConfirmClear(false)} style={settingBtnStyle}>Batal</button>
-                <button type="button" onClick={handleClearAll} data-testid="btn-confirm-clear" style={{ ...settingBtnStyle, background: "var(--red-dim)", color: "var(--red)", border: "1px solid #991b1b" }}>
-                  Hapus Semua
-                </button>
+                <button type="button" onClick={handleClearAll} data-testid="btn-confirm-clear" style={{ ...settingBtnStyle, background: "var(--red-dim)", color: "var(--red)", border: "1px solid #991b1b" }}>Hapus Semua</button>
               </div>
             </div>
           )}
@@ -436,16 +479,9 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
 }
 
 const settingBtnStyle: React.CSSProperties = {
-  background: "var(--bg-elevated)",
-  color: "var(--text-secondary)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
-  padding: "12px 16px",
-  fontSize: 13,
-  cursor: "pointer",
-  fontFamily: "'IBM Plex Mono', monospace",
-  textAlign: "left",
-  transition: "all 150ms ease",
+  background: "var(--bg-elevated)", color: "var(--text-secondary)", border: "1px solid var(--border)",
+  borderRadius: 12, padding: "12px 16px", fontSize: 13, cursor: "pointer",
+  fontFamily: "'IBM Plex Mono', monospace", textAlign: "left", transition: "all 150ms ease",
 };
 
 export default function Dashboard() {
@@ -455,6 +491,7 @@ export default function Dashboard() {
   const [priorityFilter, setPriorityFilter] = useState("All");
   const [playFilter, setPlayFilter] = useState("All");
   const [chainFilter, setChainFilter] = useState("All");
+  const [timingFilter, setTimingFilter] = useState("All");
   const [activePill, setActivePill] = useState("All");
   const [showSettings, setShowSettings] = useState(false);
   const [, setLocation] = useLocation();
@@ -494,13 +531,17 @@ export default function Dashboard() {
     if (priorityFilter !== "All" && p.priority !== priorityFilter) return false;
     if (playFilter !== "All" && p.playStatus !== playFilter) return false;
     if (chainFilter !== "All" && !p.chain.includes(chainFilter)) return false;
+    if (timingFilter !== "All" && p.timingWindow !== timingFilter) return false;
     if (search) {
       const q = search.toLowerCase();
       return (
         p.name.toLowerCase().includes(q) ||
         p.chain.some((c) => c.toLowerCase().includes(q)) ||
         p.category.some((c) => c.toLowerCase().includes(q)) ||
-        p.source.toLowerCase().includes(q)
+        p.source.toLowerCase().includes(q) ||
+        (p.verdict ?? "").toLowerCase().includes(q) ||
+        (p.reasonToDrop ?? "").toLowerCase().includes(q) ||
+        (p.timingWindow ?? "").toLowerCase().includes(q)
       );
     }
     return true;
@@ -518,124 +559,86 @@ export default function Dashboard() {
 
   const activeCount = projects.filter((p) => p.status === "Active Play").length;
   const watchCount = projects.filter((p) => p.status === "Watchlist").length;
+  const strongCount = projects.filter((p) => p.verdict === "Strong Play").length;
+  const watchVerdictCount = projects.filter((p) => p.verdict === "Watch").length;
+  const ignoreCount = projects.filter((p) => p.verdict === "Ignore").length;
+  const hasVerdictPills = strongCount > 0 || watchVerdictCount > 0 || ignoreCount > 0;
+
+  const filterDropdowns = [
+    {
+      value: statusFilter, onChange: (v: string) => setStatusFilter(v), testId: "filter-status",
+      options: [{ value: "All", label: "All Status" }, ...STATUS_ORDER.map((s) => ({ value: s, label: s }))],
+    },
+    {
+      value: priorityFilter, onChange: (v: string) => setPriorityFilter(v), testId: "filter-priority",
+      options: [{ value: "All", label: "All Priority" }, { value: "High", label: "High" }, { value: "Medium", label: "Medium" }, { value: "Low", label: "Low" }],
+    },
+    {
+      value: playFilter, onChange: (v: string) => setPlayFilter(v), testId: "filter-play",
+      options: [{ value: "All", label: "All Play" }, { value: "Belum Ada", label: "Belum Ada" }, { value: "Segera", label: "Segera" }, { value: "Aktif", label: "Aktif" }, { value: "Selesai", label: "Selesai" }],
+    },
+    {
+      value: timingFilter, onChange: (v: string) => setTimingFilter(v), testId: "filter-timing",
+      options: [{ value: "All", label: "All Timing" }, { value: "Now", label: "Now" }, { value: "This Week", label: "This Week" }, { value: "Monitor", label: "Monitor" }, { value: "No Rush", label: "No Rush" }],
+    },
+    {
+      value: chainFilter, onChange: (v: string) => setChainFilter(v), testId: "filter-chain",
+      options: [{ value: "All", label: "All Chain" }, ...allChains.map((c) => ({ value: c, label: c }))],
+    },
+  ];
 
   return (
     <div style={{ background: "var(--bg-base)", minHeight: "100vh" }}>
-      {/* Sticky Header */}
-      <div
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 30,
-          background: "var(--bg-base)",
-          borderBottom: "1px solid var(--border)",
-          padding: "12px 16px 0",
-        }}
-      >
+      <div style={{ position: "sticky", top: 0, zIndex: 30, background: "var(--bg-base)", borderBottom: "1px solid var(--border)", padding: "12px 16px 0" }}>
         {/* Title row */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 2 }}>
           <div>
-            <div
-              className="syne"
-              style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1 }}
-            >
+            <div className="syne" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1 }}>
               <span style={{ color: "var(--text-primary)" }}>ALPHA</span>
               <span style={{ color: "var(--red)" }}>TRACK</span>
             </div>
             <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 2 }}>
               {projects.length} total · {activeCount} active · {watchCount} watch
             </div>
+            {hasVerdictPills && (
+              <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                {strongCount > 0 && (
+                  <span style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 8px", fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ color: "#10b981" }}>●</span>
+                    <span style={{ color: "#10b981" }}>{strongCount} strong</span>
+                  </span>
+                )}
+                {watchVerdictCount > 0 && (
+                  <span style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 8px", fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ color: "#f59e0b" }}>●</span>
+                    <span style={{ color: "#f59e0b" }}>{watchVerdictCount} watch</span>
+                  </span>
+                )}
+                {ignoreCount > 0 && (
+                  <span style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 8px", fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ color: "#52525b" }}>●</span>
+                    <span style={{ color: "#52525b" }}>{ignoreCount} ignore</span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => setShowSettings(true)}
-              data-testid="btn-settings"
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--text-muted)",
-              }}
-            >
+            <button type="button" onClick={() => setShowSettings(true)} data-testid="btn-settings" style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--bg-elevated)", border: "1px solid var(--border)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>
               <Settings size={16} />
             </button>
-            <button
-              type="button"
-              onClick={() => setLocation("/add")}
-              data-testid="btn-add"
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                background: "var(--red)",
-                border: "none",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                fontSize: 22,
-                fontWeight: 300,
-              }}
-            >
+            <button type="button" onClick={() => setLocation("/add")} data-testid="btn-add" style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--red)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
               <Plus size={20} />
             </button>
           </div>
         </div>
 
         {/* Status pills */}
-        <div
-          className="hide-scrollbar"
-          style={{
-            overflowX: "auto",
-            display: "flex",
-            gap: 6,
-            paddingBottom: 10,
-            paddingTop: 8,
-          }}
-        >
+        <div className="hide-scrollbar" style={{ overflowX: "auto", display: "flex", gap: 6, paddingBottom: 10, paddingTop: 8 }}>
           {statusPills.map((pill) => (
-            <button
-              key={pill}
-              type="button"
-              onClick={() => {
-                setActivePill(pill);
-                setStatusFilter("All");
-              }}
-              data-testid={`pill-${pill}`}
-              style={{
-                background: activePill === pill ? "var(--red)" : "var(--bg-elevated)",
-                color: activePill === pill ? "#fff" : "var(--text-muted)",
-                border: `1px solid ${activePill === pill ? "var(--red)" : "var(--border)"}`,
-                borderRadius: 999,
-                padding: "4px 12px",
-                fontSize: 11,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                fontFamily: "'IBM Plex Mono', monospace",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
+            <button key={pill} type="button" onClick={() => { setActivePill(pill); setStatusFilter("All"); }} data-testid={`pill-${pill}`} style={{ background: activePill === pill ? "var(--red)" : "var(--bg-elevated)", color: activePill === pill ? "#fff" : "var(--text-muted)", border: `1px solid ${activePill === pill ? "var(--red)" : "var(--border)"}`, borderRadius: 999, padding: "4px 12px", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "'IBM Plex Mono', monospace", display: "flex", alignItems: "center", gap: 6 }}>
               {pill}
-              <span
-                style={{
-                  background: activePill === pill ? "rgba(255,255,255,0.2)" : "var(--bg-base)",
-                  borderRadius: 999,
-                  padding: "1px 6px",
-                  fontSize: 10,
-                }}
-              >
-                {counts[pill] ?? 0}
-              </span>
+              <span style={{ background: activePill === pill ? "rgba(255,255,255,0.2)" : "var(--bg-base)", borderRadius: 999, padding: "1px 6px", fontSize: 10 }}>{counts[pill] ?? 0}</span>
             </button>
           ))}
         </div>
@@ -644,94 +647,18 @@ export default function Dashboard() {
         <div style={{ paddingBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           <input
             type="search"
-            placeholder="search name, chain, category..."
+            placeholder="search name, chain, category, verdict..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             data-testid="input-search"
-            style={{
-              width: "100%",
-              background: "var(--bg-input)",
-              border: "1px solid var(--border)",
-              borderRadius: 12,
-              height: 40,
-              padding: "0 12px",
-              color: "var(--text-primary)",
-              fontSize: 13,
-              fontFamily: "'IBM Plex Mono', monospace",
-              outline: "none",
-            }}
+            style={{ width: "100%", background: "var(--bg-input)", border: "1px solid var(--border)", borderRadius: 12, height: 40, padding: "0 12px", color: "var(--text-primary)", fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", outline: "none" }}
           />
-          <div
-            className="hide-scrollbar"
-            style={{ overflowX: "auto", display: "flex", gap: 8 }}
-          >
-            {[
-              {
-                value: statusFilter,
-                onChange: (v: string) => setStatusFilter(v),
-                options: [
-                  { value: "All", label: "All Status" },
-                  ...STATUS_ORDER.map((s) => ({ value: s, label: s })),
-                ],
-                testId: "filter-status",
-              },
-              {
-                value: priorityFilter,
-                onChange: (v: string) => setPriorityFilter(v),
-                options: [
-                  { value: "All", label: "All Priority" },
-                  { value: "High", label: "High" },
-                  { value: "Medium", label: "Medium" },
-                  { value: "Low", label: "Low" },
-                ],
-                testId: "filter-priority",
-              },
-              {
-                value: playFilter,
-                onChange: (v: string) => setPlayFilter(v),
-                options: [
-                  { value: "All", label: "All Play" },
-                  { value: "Belum Ada", label: "Belum Ada" },
-                  { value: "Segera", label: "Segera" },
-                  { value: "Aktif", label: "Aktif" },
-                  { value: "Selesai", label: "Selesai" },
-                ],
-                testId: "filter-play",
-              },
-              {
-                value: chainFilter,
-                onChange: (v: string) => setChainFilter(v),
-                options: [
-                  { value: "All", label: "All Chain" },
-                  ...allChains.map((c) => ({ value: c, label: c })),
-                ],
-                testId: "filter-chain",
-              },
-            ].map((f) => (
+          <div className="hide-scrollbar" style={{ overflowX: "auto", display: "flex", gap: 8 }}>
+            {filterDropdowns.map((f) => (
               <div key={f.testId} style={{ position: "relative", flexShrink: 0 }}>
-                <select
-                  value={f.value}
-                  onChange={(e) => f.onChange(e.target.value)}
-                  data-testid={f.testId}
-                  style={{
-                    background: "var(--bg-elevated)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 12,
-                    height: 36,
-                    padding: "0 32px 0 12px",
-                    color: "var(--text-secondary)",
-                    fontSize: 12,
-                    fontFamily: "'IBM Plex Mono', monospace",
-                    cursor: "pointer",
-                    outline: "none",
-                    appearance: "none",
-                    WebkitAppearance: "none",
-                  }}
-                >
+                <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 12, height: 36, padding: "0 32px 0 12px", color: "var(--text-secondary)", fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", cursor: "pointer", outline: "none", appearance: "none", WebkitAppearance: "none" }}>
                   {f.options.map((opt) => (
-                    <option key={opt.value} value={opt.value} style={{ background: "var(--bg-elevated)" }}>
-                      {opt.label}
-                    </option>
+                    <option key={opt.value} value={opt.value} style={{ background: "var(--bg-elevated)" }}>{opt.label}</option>
                   ))}
                 </select>
                 <ChevronDown size={12} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
@@ -746,32 +673,13 @@ export default function Dashboard() {
         {filtered.length === 0 ? (
           <div style={{ textAlign: "center", paddingTop: 60 }}>
             <div style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16 }}>tidak ada project</div>
-            <button
-              type="button"
-              onClick={() => setLocation("/add")}
-              data-testid="btn-add-empty"
-              style={{
-                background: "var(--red)",
-                color: "#fff",
-                border: "none",
-                borderRadius: 12,
-                padding: "10px 24px",
-                fontSize: 13,
-                cursor: "pointer",
-                fontFamily: "'IBM Plex Mono', monospace",
-              }}
-            >
+            <button type="button" onClick={() => setLocation("/add")} data-testid="btn-add-empty" style={{ background: "var(--red)", color: "#fff", border: "none", borderRadius: 12, padding: "10px 24px", fontSize: 13, cursor: "pointer", fontFamily: "'IBM Plex Mono', monospace" }}>
               + tambah project
             </button>
           </div>
         ) : (
           filtered.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              onStatusChange={handleStatusChange}
-              onDelete={handleDelete}
-            />
+            <ProjectCard key={project.id} project={project} onStatusChange={handleStatusChange} onDelete={handleDelete} />
           ))
         )}
       </div>

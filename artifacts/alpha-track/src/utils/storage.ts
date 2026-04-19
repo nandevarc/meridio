@@ -1,10 +1,39 @@
-import { Project, STORAGE_KEY } from "../types";
+import { Project, STORAGE_KEY, computeQuickScore } from "../types";
+
+export function migrateProjects(projects: Project[]): Project[] {
+  let changed = false;
+  const migrated = projects.map((p) => {
+    const updates: Partial<Project> = {};
+    if (!("verdict" in p)) { updates.verdict = null; }
+    if (!("scoreNarrative" in p)) { updates.scoreNarrative = null; }
+    if (!("scoreBuilder" in p)) { updates.scoreBuilder = null; }
+    if (!("scoreCT" in p)) { updates.scoreCT = null; }
+    if (!("scoreTiming" in p)) { updates.scoreTiming = null; }
+    if (!("scoreExecution" in p)) { updates.scoreExecution = null; }
+    if (!("ctCount" in p)) { updates.ctCount = null; }
+    if (!("timingWindow" in p)) { updates.timingWindow = null; }
+    if (!("reasonToDrop" in p)) { updates.reasonToDrop = ""; }
+    if (!("biaCheck" in p)) { updates.biaCheck = ""; }
+    if (Object.keys(updates).length > 0) {
+      changed = true;
+      return { ...p, ...updates };
+    }
+    return p;
+  });
+  if (changed) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+    } catch {}
+  }
+  return migrated;
+}
 
 export function getProjects(): Project[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as Project[];
+    const parsed = JSON.parse(raw) as Project[];
+    return migrateProjects(parsed);
   } catch {
     return [];
   }
@@ -60,3 +89,5 @@ export function formatDateTime(iso: string): string {
   const mins = String(d.getMinutes()).padStart(2, "0");
   return `${day}/${month}/${year}, ${hours}.${mins}`;
 }
+
+export { computeQuickScore };

@@ -123,6 +123,16 @@ button, a, input, select, textarea {
   transition: all 150ms ease;
 }
 
+/* Pulse animation for "Now" timing and "High + Active Play" priority */
+@keyframes pulse-red {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.pulse-red {
+  animation: pulse-red 1.5s ease-in-out infinite;
+}
+
 /* Toast animation */
 @keyframes toastIn {
   from {
