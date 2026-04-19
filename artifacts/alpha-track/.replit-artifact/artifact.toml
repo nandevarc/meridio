@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Alpha Track"
+version = "1.0.0"
+id = "artifacts/alpha-track"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24684
+
+[services.development]
+run = "pnpm --filter @workspace/alpha-track run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/alpha-track", "run", "build" ]
+publicDir = "artifacts/alpha-track/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24684"
+BASE_PATH = "/"

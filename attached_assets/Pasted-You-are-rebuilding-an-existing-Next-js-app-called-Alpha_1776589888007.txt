@@ -1,0 +1,454 @@
+You are rebuilding an existing Next.js app called Alpha Track from scratch. 
+Do not modify the existing code — create a clean new implementation based 
+entirely on this specification. Use localStorage for data persistence.
+
+---
+
+TECH STACK:
+- Next.js (App Router)
+- Tailwind CSS
+- No external UI libraries
+- No authentication
+- No external APIs
+- localStorage for all data
+
+---
+
+COLOR SYSTEM (use these exact values as CSS variables):
+
+--bg-base: #080808
+--bg-surface: #0f0f0f
+--bg-elevated: #161616
+--bg-input: #1a1a1a
+--border: #222222
+--border-focus: #3a3a3a
+--text-primary: #f0f0f0
+--text-secondary: #888888
+--text-muted: #444444
+
+--red: #dc2626
+--red-dim: #7f1d1d
+--emerald: #10b981
+--emerald-dim: #064e3b
+--amber: #f59e0b
+--amber-dim: #78350f
+--blue: #3b82f6
+--blue-dim: #1e3a5f
+--purple: #a855f7
+--purple-dim: #3b0764
+--zinc: #52525b
+
+Status colors (use these exact mappings):
+- Screening: text #888, bg #1a1a1a, border #2a2a2a
+- Watchlist: text #3b82f6, bg #1e3a5f, border #1d4ed8
+- Active Play: text #10b981, bg #064e3b, border #065f46
+- Skip: text #dc2626, bg #7f1d1d, border #991b1b
+- Done: text #a855f7, bg #3b0764, border #7e22ce
+
+Priority colors:
+- High: #dc2626
+- Medium: #f59e0b
+- Low: #52525b
+
+Play Status colors:
+- Belum Ada: #52525b
+- Segera: #f59e0b
+- Aktif: #10b981
+- Selesai: #3b82f6
+
+---
+
+TYPOGRAPHY:
+- Import from Google Fonts: Syne (700, 800) and IBM Plex Mono (400, 500, 600)
+- App title and project names: Syne 800
+- All other text: IBM Plex Mono
+- Base font size: 13px
+- Do NOT use Inter, Roboto, or system fonts anywhere
+
+---
+
+DATA STRUCTURE:
+Store all projects as a JSON array in localStorage key: "alphatrack_v2"
+
+Each project object must have these exact fields:
+
+{
+  id: string (auto-generated uuid),
+  
+  // Core
+  name: string,
+  category: string[],        // array of tags
+  chain: string[],           // array of tags
+  stage: string[],           // array of tags
+  findDate: string,          // ISO date string, auto-set on creation
+  
+  // Links
+  website: string,
+  twitter: string,
+  discord: string,
+  telegram: string,
+  github: string,
+  
+  // Analysis
+  description: string,
+  narrative: string,
+  builder: string,           // NEW: builder & team info
+  ctSignal: string,
+  conviction: "Low" | "Medium" | "High",
+  decisionNote: string,
+  quickScore: number | null, // 0-25, nullable
+  source: string,            // NEW: where they found the project
+  
+  // Play
+  playTypes: string[],       // multi-select tags
+  playStatus: "Belum Ada" | "Segera" | "Aktif" | "Selesai",
+  actionRequired: string,
+  playNotes: string,         // NEW: free text play notes
+  
+  // Tracking
+  status: "Screening" | "Watchlist" | "Active Play" | "Done" | "Skip",
+  priority: "Low" | "Medium" | "High",
+  
+  // Timestamps
+  createdAt: string,         // ISO datetime string
+  updatedAt: string          // ISO datetime string, update on every save
+}
+
+---
+
+PAGES AND ROUTING:
+
+/ → Dashboard page
+/add → Add project page (Quick Add mode)
+/add?full=true → Add project page (Full Form mode)
+/project/[id] → Detail page
+/project/[id]/edit → Edit page
+
+---
+
+PAGE 1: DASHBOARD (/)
+
+Layout: Full mobile-first single column. Sticky header at top.
+
+HEADER SECTION (sticky, z-index 30):
+- Line 1: App name "ALPHA" in white + "TRACK" in red (#dc2626), 
+  font Syne 800, size 20px, letter-spacing -0.03em
+- Subtitle below: "{total} total · {activeCount} active · {watchCount} watch" 
+  in --text-muted, 11px
+- Top-right: circular red button (+) 40x40px to go to /add
+- Below title: stat pills in a horizontal scroll row showing counts for 
+  each status. Pills: All, Screening, Watchlist, Active Play, Done, Skip. 
+  Active pill: red bg, white text. Inactive: --bg-elevated, --text-muted, 
+  --border. Each pill shows count badge next to label.
+
+FILTER BAR (below stats, sticky):
+- Search input: full width, placeholder "search name, chain, category..."
+  bg --bg-input, border --border, rounded-xl, height 40px
+- Filter row (horizontal scroll, no scrollbar visible):
+  - Status filter dropdown (default: All Status)
+  - Priority filter dropdown (default: All Priority)  
+  - Play Status filter dropdown (default: All Play) ← THIS IS NEW AND IMPORTANT
+  - Chain filter dropdown (default: All Chain) - populated dynamically from data
+- All dropdowns: bg --bg-elevated, border --border, text --text-secondary, 
+  rounded-xl, height 36px, text 12px
+
+SORT: Default sort order:
+1. Priority (High first)
+2. updatedAt (newest first)
+
+PROJECT CARDS (card list, NOT table):
+Each project renders as a card. Cards are stacked vertically with 8px gap.
+Card background: --bg-surface. Border: --border. Border-radius: 12px.
+On expand (tap header area), card shows extra details.
+
+CARD COLLAPSED STATE (always visible):
+Row 1 (top):
+- Left: Priority dot (colored circle 8px) + Project name (Syne 700, 14px, white)
+- Right: Status badge (pill shape, colored per status config above, 11px text)
+
+Row 2:
+- Chain tags (if any): small bg --bg-elevated pills, text --text-muted, 11px
+- Category tags (if any): same style but different bg (#1e293b), text (#64748b)
+- Stage tag (if any): same style
+
+Row 3 (conditional, only show if data exists):
+- CT Signal text: prefix "CT " in --text-muted, then value in --text-secondary, 
+  12px, truncate at 1 line
+- Play info: if playStatus is "Segera" or "Aktif", show a green/amber dot + 
+  playStatus badge + actionRequired text (truncated), 11px
+
+IMPORTANT VISUAL RULE: If playStatus is "Segera" or "Aktif", add a subtle 
+left border accent on the card: 3px solid --emerald (Aktif) or --amber (Segera).
+This makes active plays immediately visible from the list.
+
+CARD EXPANDED STATE (tap to toggle):
+When expanded, show below the collapsed content:
+- Description (if exists): label "desc" in --text-muted, value in --text-secondary
+- Narrative (if exists): label "narrative" in --text-muted, value
+- Builder (if exists): label "builder" in --text-muted, value in monospace
+- Play Types: colored tags (emerald dim bg, emerald text)
+- Play Notes (if exists): label "play notes", value
+- Quick Score (if exists): "score X/25" in red
+- Source (if exists): label "source" in --text-muted, value
+- Links row: show icons/text for website, twitter, discord, telegram, github 
+  — only show links that have data. Each is a tappable anchor tag.
+- Action buttons row:
+  - "share" button: bg --bg-elevated, --text-secondary, border --border
+  - "edit" button: bg --bg-elevated, --text-secondary, border --border  
+  - "detail" button: bg --bg-elevated, --text-secondary, border --border
+  - "hapus" button: bg #7f1d1d, text #dc2626, border #991b1b
+  All buttons: rounded-xl, 11px text, height 36px
+
+QUICK STATUS CHANGE (critical feature):
+- In collapsed state, the status badge on the right is TAPPABLE
+- Tapping it cycles to the next status in this order:
+  Screening → Watchlist → Active Play → Done → Skip → Screening
+- Tapping must NOT trigger card expand/collapse
+- Must stop propagation of the tap event
+- Show a small toast notification at bottom: "status → [new status]"
+- Auto-save to localStorage immediately
+
+DELETE CONFIRMATION:
+When "hapus" is tapped, do NOT delete immediately.
+Show an inline confirmation inside the card:
+"Hapus [project name]? " + [Batal] [Hapus] buttons
+Only delete when user confirms by tapping [Hapus].
+
+EMPTY STATE:
+If no projects match filter: show centered text "tidak ada project" with 
+a small "+" button to add. No complex illustrations needed.
+
+BOTTOM PADDING: Add 80px padding at bottom so last card is not hidden 
+behind any potential bottom bar.
+
+---
+
+PAGE 2: ADD PROJECT (/add)
+
+This page has TWO modes that the user can toggle between:
+
+MODE A — QUICK ADD (default, when no ?full=true param):
+Show only these fields:
+1. Nama Project (required, text input, autofocus)
+2. Chain (tag input)
+3. Twitter / X (url input)
+4. CT Signal (text input)
+5. Status (select: default Screening)
+6. Priority (select: default Medium)
+7. Source (text: where did you find this? e.g. "X Scroll", "CT Share")
+
+At top: toggle button "Mode Cepat | Form Lengkap"
+Active mode button: red bg, white text.
+Inactive: --bg-elevated, --text-muted.
+
+"Simpan" button at bottom: full width, red bg, white text, 48px height, 
+font IBM Plex Mono 500.
+
+Tapping "Simpan" in Quick Add mode:
+- Validates only "Nama Project" is required
+- Sets findDate, createdAt, updatedAt to now
+- Saves to localStorage
+- Redirects to dashboard
+
+MODE B — FULL FORM (?full=true or toggled):
+Show ALL fields organized in collapsible sections.
+Each section has a header that can collapse/expand (default all expanded).
+
+Section headers: uppercase, 11px, --text-muted, IBM Plex Mono 600, 
+with a "// " prefix like "// 01. CORE DATA"
+
+SECTION 01. CORE DATA:
+- Nama Project (required text, autofocus)
+- Category (tag input)
+- Chain (tag input)
+- Stage (tag input)
+- Find Date (date input, default today)
+- Source (text: "dari mana kamu dapat project ini?")
+
+SECTION 02. LINKS:
+- Website (url)
+- Twitter / X (url)
+- Discord (url)
+- Telegram (url)
+- Github (url)
+
+SECTION 03. ANALYSIS:
+- Description (textarea, 3 rows)
+- Narrative (textarea, 2 rows)
+- Builder & Team (textarea, 2 rows, 
+  placeholder: "nama: @handle, afiliasi: ...")
+- CT Signal (text, placeholder: "Guar Emperor, JG, Bitman...")
+- Conviction (select: Low / Medium / High, default Medium)
+- Quick Score (number input, min 0, max 25, nullable)
+- Decision Note (textarea, 2 rows)
+
+SECTION 04. PLAY:
+- Jenis Play (multi-select tags):
+  Available options: Testnet, Early Mint, NFTs, Whitelist, Social, 
+  Degen, Retro, Role, Grinding, Node, Campaign, Mining, Gaming
+  Render as tappable pill buttons. Selected: emerald dim bg, emerald text, 
+  emerald border. Unselected: --bg-elevated, --text-muted, --border.
+- Play Status (select: Belum Ada / Segera / Aktif / Selesai, default Belum Ada)
+- Action Required (text)
+- Play Notes (textarea, 2 rows)
+
+SECTION 05. TRACKING:
+- Status (select: Screening / Watchlist / Active Play / Done / Skip, 
+  default Screening)
+- Priority (select: Low / Medium / High, default Medium)
+
+STICKY BOTTOM BAR (both modes):
+Fixed at bottom, bg --bg-base, border-top --border, padding 16px.
+Contains: "Simpan" button (full width red) and "Batal" link (--text-muted, 
+small, centered below button).
+
+---
+
+TAG INPUT COMPONENT:
+Used for Category, Chain, Stage, Jenis Play (multi-select only, not free input).
+
+For Category, Chain, Stage (free-input tags):
+- Shows existing tags as pills with "×" to remove
+- Text input below: type and press Enter or comma to add tag
+- Input: bg --bg-input, border --border, rounded-xl
+- Tag pill: bg --bg-elevated, text --text-secondary, border --border, 
+  with × button. Tap × removes the tag.
+
+For Jenis Play (predefined options only):
+- Show all options as pill buttons
+- Tap to toggle selected/unselected
+- No text input needed
+
+---
+
+PAGE 3: DETAIL (/project/[id])
+
+Header: back arrow + project name (Syne 800, 18px) + Edit button (top right)
+
+Below header: status badge + priority badge + conviction badge in a row.
+
+Sections same as form (Core Data, Analysis, Play, Comms & Links) but 
+display-only. Show labels in --text-muted and values in --text-secondary.
+If a field is empty, do not render that field at all.
+
+SHARE BUTTON: Prominent button at the bottom of the page, full width, 
+bg --bg-elevated, text white, border --border. Label: "generate share text"
+
+When tapped, show a bottom sheet (slides up from bottom) with:
+- Generated share text (see format below)
+- "Salin Teks" button: full width, red bg
+- "Tutup" text link below
+
+SHARE TEXT FORMAT (generate this from project data):
+◈ [NAME IN UPPERCASE]
+[chain joined by " · "] · [category joined by " · "] · [stage joined by " · "]
+[narrative or description, whichever exists]
+Builder: [builder if exists]
+CT Signal: [ctSignal if exists]
+Play: [actionRequired if exists]
+Type: [playTypes joined by ", " if exists]
+Score: [quickScore]/25 [if quickScore exists]
+[website if exists]
+[twitter if exists]
+Only include lines where data exists. No empty lines for missing fields 
+except the one blank line after the narrative/description.
+
+DELETE: Small "hapus project" text link at very bottom of page, 
+colored --red, 12px. When tapped, show a confirmation modal overlay:
+"Yakin hapus [name]?" + [Batal] [Hapus] buttons.
+Batal: closes modal. Hapus: deletes and redirects to dashboard.
+
+---
+
+PAGE 4: EDIT (/project/[id]/edit)
+
+Identical to Add Full Form but pre-populated with existing data.
+Save updates the project and redirects back to detail page.
+Show "Last Updated: [datetime]" at bottom in --text-muted, 11px.
+
+---
+
+DATA BACKUP / RESTORE FEATURE:
+
+Add a small "⚙" icon button in the dashboard header (top right, next to + button).
+Tapping opens a bottom sheet with two options:
+
+1. "Backup Data (JSON)" button: 
+   - Exports all localStorage data as a JSON file
+   - Filename: alphatrack-backup-[YYYY-MM-DD].json
+   - Triggers browser file download
+
+2. "Restore Data" button:
+   - Opens file picker, accepts .json only
+   - Reads the file, validates it contains an array
+   - Replaces localStorage data with imported data
+   - Shows success toast and refreshes list
+
+3. "Hapus Semua Data" text link:
+   - Colored red, 12px
+   - Requires confirmation: "Hapus semua [n] project?" + confirm button
+
+---
+
+TOAST NOTIFICATIONS:
+
+Show a small toast at bottom center for:
+- Status changed: "status → Active Play"
+- Project saved: "project disimpan"
+- Project deleted: "project dihapus"
+- Data backed up: "backup berhasil"
+- Data restored: "data diimport · [n] project"
+
+Toast styles: bg --bg-elevated, border --border, text --text-secondary, 
+rounded-full, 12px, font IBM Plex Mono. 
+Animation: fade in from bottom, auto-dismiss after 2000ms.
+
+---
+
+GENERAL RULES:
+
+1. All forms: no HTML <form> tags, use div + onClick handlers only
+2. All inputs: bg --bg-input, border --border, rounded-xl, padding 10px 12px, 
+   text --text-primary, 13px, IBM Plex Mono. Focus: border --border-focus.
+   No default browser outline (outline: none).
+3. All select elements: custom styled, same as inputs, no default arrow.
+   Add a custom chevron icon.
+4. Tap targets: minimum 44x44px for all interactive elements
+5. No page reloads on any action — all state updates happen in React state 
+   and persist to localStorage
+6. Do not use any animation library. CSS transitions only.
+   Transitions: all interactive elements have transition: all 150ms ease
+7. Scrollbar: hide on all overflow-x-auto containers. Show thin (2px) 
+   red scrollbar on overflow-y containers.
+8. -webkit-tap-highlight-color: transparent on all interactive elements
+9. Font import: add to global CSS, not inline
+10. ID generation: use crypto.randomUUID() or fallback to 
+    Date.now().toString(36) + Math.random().toString(36).substr(2)
+11. All dates displayed in format: "DD MMM YYYY" (e.g. "19 Apr 2026")
+12. All datetimes displayed in format: "DD/MM/YYYY, HH.MM" 
+    (e.g. "19/04/2026, 15.56")
+
+---
+
+DO NOT:
+- Do not use any purple gradients
+- Do not use Inter or Roboto font
+- Do not use any external component libraries (no shadcn, no radix, 
+  no headlessui)
+- Do not add a sidebar or bottom navigation bar
+- Do not add any loading spinners — all operations are synchronous localStorage
+- Do not add any charts or statistics visualizations
+- Do not add any drag-and-drop
+- Do not create separate CSS files — use Tailwind classes only, 
+  with occasional inline style for exact values not in Tailwind
+
+---
+
+START BY:
+1. Setting up the project structure
+2. Creating the localStorage utility functions (get, set, update, delete)
+3. Creating the tag input component
+4. Building the dashboard page
+5. Building the add/edit form
+6. Building the detail page
+7. Testing that data persists across page refreshes
