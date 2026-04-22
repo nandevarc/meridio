@@ -188,8 +188,8 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
             )}
           </div>
           {/* Chevron indicator */}
-          <span style={{ color: "#444444", fontSize: 12, flexShrink: 0, marginRight: 4, display: "flex", alignItems: "center" }}>
-            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          <span style={{ color: "#444444", flexShrink: 0, marginRight: 4, display: "flex", alignItems: "center", transform: expanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 150ms ease" }}>
+            <ChevronDown size={12} />
           </span>
           {/* Status badge */}
           <button
@@ -257,7 +257,7 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
           onClick={() => setExpanded((e) => !e)}
           style={{
             background: "#111111",
-            borderTop: "1px solid #1a1a1a",
+            borderTop: "1px solid #2a2a2a",
             borderRadius: expanded ? "0" : "0 0 12px 12px",
             padding: "8px 12px",
             display: "flex",
@@ -273,14 +273,18 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
         </div>
       )}
 
-      {/* Expanded content — "drawer" effect */}
-      {expanded && (
-        <div style={{
-          background: "#0a0a0a",
-          borderTop: "1px solid #1a1a1a",
-          borderRadius: "0 0 12px 12px",
-          padding: 12,
-        }}>
+      {/* Expanded content — animated drawer */}
+      <div style={{
+        background: "#0a0a0a",
+        borderTop: expanded ? "1px solid #2a2a2a" : "none",
+        borderRadius: "0 0 12px 12px",
+        maxHeight: expanded ? 1000 : 0,
+        overflow: "hidden",
+        opacity: expanded ? 1 : 0,
+        transition: "max-height 200ms ease-out, opacity 150ms ease-out",
+      }}>
+        {/* Gradient strip at top of drawer */}
+        <div style={{ height: 4, width: "100%", background: "linear-gradient(to bottom, #141414, #0a0a0a)", flexShrink: 0 }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {project.description && (
               <div>
@@ -379,8 +383,7 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
               )}
             </div>
           </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -631,9 +634,9 @@ export default function Dashboard() {
             data-testid="input-search"
             style={{ width: "100%", background: "var(--bg-input)", border: "1px solid var(--border)", borderRadius: 12, height: 40, padding: "0 12px", color: "var(--text-primary)", fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", outline: "none", boxSizing: "border-box" }}
           />
-          {/* Filter dropdowns — 2x2 grid for first 4, chain below */}
+          {/* Filter dropdowns — Row 1: Status + Priority */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            {filterDropdowns.slice(0, 4).map((f) => (
+            {[filterDropdowns[0], filterDropdowns[1]].map((f) => (
               <div key={f.testId} style={{ position: "relative" }}>
                 <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={selectStyle}>
                   {f.options.map((opt) => (
@@ -644,17 +647,28 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-          {/* Chain filter — full width below */}
-          {allChains.length > 0 && (
-            <div style={{ position: "relative" }}>
-              <select value={chainFilter} onChange={(e) => setChainFilter(e.target.value)} data-testid="filter-chain" style={{ ...selectStyle, width: "100%" }}>
-                {filterDropdowns[4].options.map((opt) => (
-                  <option key={opt.value} value={opt.value} style={{ background: "var(--bg-elevated)" }}>{opt.label}</option>
-                ))}
-              </select>
-              <ChevronDown size={11} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
-            </div>
-          )}
+          {/* Row 2: Play + Chain */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {[filterDropdowns[2], filterDropdowns[4]].map((f) => (
+              <div key={f.testId} style={{ position: "relative" }}>
+                <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={selectStyle}>
+                  {f.options.map((opt) => (
+                    <option key={opt.value} value={opt.value} style={{ background: "var(--bg-elevated)" }}>{opt.label}</option>
+                  ))}
+                </select>
+                <ChevronDown size={11} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
+              </div>
+            ))}
+          </div>
+          {/* Row 3: Timing — full width */}
+          <div style={{ position: "relative" }}>
+            <select value={filterDropdowns[3].value} onChange={(e) => filterDropdowns[3].onChange(e.target.value)} data-testid={filterDropdowns[3].testId} style={{ ...selectStyle, width: "100%" }}>
+              {filterDropdowns[3].options.map((opt) => (
+                <option key={opt.value} value={opt.value} style={{ background: "var(--bg-elevated)" }}>{opt.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={11} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
+          </div>
         </div>
       </div>
 
