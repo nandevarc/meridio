@@ -5,10 +5,10 @@ import {
   STATUS_ORDER, STATUS_STYLES, PRIORITY_COLORS, PLAY_STATUS_COLORS,
   VERDICT_STYLES, TIMING_STYLES, scoreColor, computeQuickScore,
 } from "../types";
-import { getProjects, updateProject, deleteProject, saveProjects, formatDateTime } from "../utils/storage";
+import { getProjects, updateProject, deleteProject, saveProjects } from "../utils/storage";
 import { useToast } from "../context/ToastContext";
 import { STORAGE_KEY } from "../types";
-import { Settings, Plus, ChevronDown, ExternalLink } from "lucide-react";
+import { Settings, Plus, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 
 function cycleStatus(current: ProjectStatus): ProjectStatus {
   const idx = STATUS_ORDER.indexOf(current);
@@ -52,6 +52,20 @@ function generateShareText(project: Project): string {
   return lines.join("\n");
 }
 
+// line-clamp style helper
+const clamp2: React.CSSProperties = {
+  display: "-webkit-box",
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: "vertical",
+  overflow: "hidden",
+};
+const clamp1: React.CSSProperties = {
+  display: "-webkit-box",
+  WebkitLineClamp: 1,
+  WebkitBoxOrient: "vertical",
+  overflow: "hidden",
+};
+
 interface CardProps {
   project: Project;
   onStatusChange: (id: string, newStatus: ProjectStatus) => void;
@@ -66,21 +80,17 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
   const qs = computeQuickScore(project);
   const isDimmed = project.verdict === "Ignore" || project.status === "Skip";
 
-  // Card visual rules
   const isHighScore = !isDimmed && qs !== null && qs >= 18;
   const isStrongPlay = !isDimmed && project.verdict === "Strong Play";
   const isActiveHigh = !isDimmed && project.status === "Active Play" && project.priority === "High";
-  const isTimingNow = project.timingWindow === "Now";
 
-  // Border logic
   let cardBorder = "1px solid var(--border)";
   let cardBg = "var(--bg-surface)";
   if (!isDimmed) {
-    if (isTimingNow) cardBorder = `1px solid rgba(220,38,38,0.4)`;
+    if (project.timingWindow === "Now") cardBorder = `1px solid rgba(220,38,38,0.4)`;
     if (isHighScore) { cardBg = "#111111"; cardBorder = "1px solid #2a2a2a"; }
   }
 
-  // Left border accent
   let leftBorder = "";
   const showPlayAccent = !isDimmed && (project.playStatus === "Aktif" || project.playStatus === "Segera");
   const playAccentColor = project.playStatus === "Aktif" ? "var(--emerald)" : "var(--amber)";
@@ -93,7 +103,6 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
   const statusStyle = STATUS_STYLES[project.status];
   const priorityColor = PRIORITY_COLORS[project.priority];
 
-  // Name color
   let nameColor = "var(--text-primary)";
   if (isDimmed) nameColor = "#52525b";
   else if (isStrongPlay) nameColor = "#10b981";
@@ -106,14 +115,12 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
     { key: "github", label: "gh", url: project.github },
   ].filter((l) => l.url);
 
-  // Action required / play notes row
   const actionText = project.actionRequired || "";
   const playNotesText = project.playNotes || "";
   const showActionRow = actionText !== "" || playNotesText !== "";
   const actionRowText = actionText || playNotesText;
   const actionArrowColor = actionText ? "#dc2626" : "#f59e0b";
 
-  // CT row
   const hasCTRow = !!(project.ctSignal || (project.ctCount != null && project.ctCount > 0));
   const showPlayBadge = showPlayAccent;
 
@@ -135,21 +142,13 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
         onClick={() => setExpanded((e) => !e)}
         style={{ padding: "12px 14px 10px", cursor: "pointer", userSelect: "none" }}
       >
-        {/* Row 1: priority dot + timing badge + name + verdict badge + status */}
+        {/* Row 1: priority dot + timing badge + name + verdict badge + chevron + status */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7, gap: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-            {/* Priority dot — pulses when Active+High */}
             <div
               className={isActiveHigh ? "pulse-red" : ""}
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: priorityColor,
-                flexShrink: 0,
-              }}
+              style={{ width: 8, height: 8, borderRadius: "50%", background: priorityColor, flexShrink: 0 }}
             />
-            {/* Timing badge */}
             {project.timingWindow && TIMING_STYLES[project.timingWindow] && (
               <span
                 className={project.timingWindow === "Now" ? "pulse-red" : ""}
@@ -167,61 +166,40 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
                 {project.timingWindow}
               </span>
             )}
-            {/* High score prefix */}
             {isHighScore && (
               <span style={{ color: "var(--text-muted)", fontSize: 12, flexShrink: 0 }}>◈</span>
             )}
-            {/* Name */}
             <span
               className="syne"
-              style={{
-                color: nameColor,
-                fontWeight: 700,
-                fontSize: 14,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                flexShrink: 1,
-              }}
+              style={{ color: nameColor, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}
             >
               {project.name}
             </span>
-            {/* Verdict badge */}
             {project.verdict && VERDICT_STYLES[project.verdict] && (
               <span style={{
                 background: VERDICT_STYLES[project.verdict].bg,
                 color: VERDICT_STYLES[project.verdict].text,
                 border: `1px solid ${VERDICT_STYLES[project.verdict].border}`,
-                borderRadius: 999,
-                padding: "1px 7px",
-                fontSize: 10,
-                flexShrink: 0,
-                fontFamily: "'IBM Plex Mono', monospace",
-                whiteSpace: "nowrap",
+                borderRadius: 999, padding: "1px 7px", fontSize: 10, flexShrink: 0,
+                fontFamily: "'IBM Plex Mono', monospace", whiteSpace: "nowrap",
               }}>
                 {project.verdict}
               </span>
             )}
           </div>
+          {/* Chevron indicator */}
+          <span style={{ color: "#444444", fontSize: 12, flexShrink: 0, marginRight: 4, display: "flex", alignItems: "center" }}>
+            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </span>
           {/* Status badge */}
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStatusChange(project.id, cycleStatus(project.status));
-            }}
+            onClick={(e) => { e.stopPropagation(); onStatusChange(project.id, cycleStatus(project.status)); }}
             data-testid={`status-badge-${project.id}`}
             style={{
-              background: statusStyle.bg,
-              color: statusStyle.text,
-              border: `1px solid ${statusStyle.border}`,
-              borderRadius: 999,
-              padding: "3px 10px",
-              fontSize: 11,
-              cursor: "pointer",
-              fontFamily: "'IBM Plex Mono', monospace",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
+              background: statusStyle.bg, color: statusStyle.text, border: `1px solid ${statusStyle.border}`,
+              borderRadius: 999, padding: "3px 10px", fontSize: 11, cursor: "pointer",
+              fontFamily: "'IBM Plex Mono', monospace", whiteSpace: "nowrap", flexShrink: 0,
             }}
           >
             {project.status}
@@ -273,55 +251,71 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
         )}
       </div>
 
-      {/* Action required row — always visible if data exists */}
+      {/* Action required row — always visible */}
       {showActionRow && (
-        <div style={{
-          background: "#111111",
-          borderTop: "1px solid #1a1a1a",
-          borderRadius: "0 0 12px 12px",
-          padding: "8px 12px",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          cursor: "pointer",
-        }}
+        <div
           onClick={() => setExpanded((e) => !e)}
+          style={{
+            background: "#111111",
+            borderTop: "1px solid #1a1a1a",
+            borderRadius: expanded ? "0" : "0 0 12px 12px",
+            padding: "8px 12px",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            cursor: "pointer",
+          }}
         >
           <span style={{ color: actionArrowColor, fontSize: 13, flexShrink: 0 }}>→</span>
-          <span style={{
-            color: "var(--text-primary)",
-            fontSize: 12,
-            fontWeight: 500,
-            fontFamily: "'IBM Plex Mono', monospace",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}>
+          <span style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 500, fontFamily: "'IBM Plex Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {actionRowText}
           </span>
         </div>
       )}
 
-      {/* Expanded content */}
+      {/* Expanded content — "drawer" effect */}
       {expanded && (
-        <div style={{ padding: "0 14px 14px", borderTop: "1px solid var(--border)" }}>
-          <div style={{ paddingTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{
+          background: "#0a0a0a",
+          borderTop: "1px solid #1a1a1a",
+          borderRadius: "0 0 12px 12px",
+          padding: 12,
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {project.description && (
               <div>
                 <span style={{ color: "var(--text-muted)", fontSize: 11 }}>desc </span>
-                <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{project.description}</span>
+                <span style={{ color: "var(--text-secondary)", fontSize: 12, ...clamp2 }}>{project.description}</span>
+                {project.description.length > 120 && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setLocation(`/project/${project.id}`); }}
+                    style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: 10, cursor: "pointer", padding: "0 0 0 4px", fontFamily: "'IBM Plex Mono', monospace" }}
+                  >
+                    lihat semua →
+                  </button>
+                )}
               </div>
             )}
             {project.narrative && (
               <div>
                 <span style={{ color: "var(--text-muted)", fontSize: 11 }}>narrative </span>
-                <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{project.narrative}</span>
+                <span style={{ color: "var(--text-secondary)", fontSize: 12, ...clamp2 }}>{project.narrative}</span>
+                {project.narrative.length > 120 && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setLocation(`/project/${project.id}`); }}
+                    style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: 10, cursor: "pointer", padding: "0 0 0 4px", fontFamily: "'IBM Plex Mono', monospace" }}
+                  >
+                    lihat semua →
+                  </button>
+                )}
               </div>
             )}
             {project.builder && (
               <div>
                 <span style={{ color: "var(--text-muted)", fontSize: 11 }}>builder </span>
-                <span style={{ color: "var(--text-secondary)", fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>{project.builder}</span>
+                <span style={{ color: "var(--text-secondary)", fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", ...clamp1 }}>{project.builder}</span>
               </div>
             )}
             {project.playTypes.length > 0 && (
@@ -346,7 +340,6 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
                 <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{project.source}</span>
               </div>
             )}
-            {/* Kill signal — only if ignore/skip */}
             {project.reasonToDrop && (project.verdict === "Ignore" || project.status === "Skip") && (
               <div>
                 <span style={{ color: "#dc2626", fontSize: 11 }}>kill signal </span>
@@ -372,13 +365,13 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
             )}
             {/* Action buttons */}
             <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
-              <button type="button" onClick={() => { navigator.clipboard?.writeText(generateShareText(project)).catch(() => {}); alert(generateShareText(project)); }} data-testid={`btn-share-${project.id}`} style={actionBtnStyle}>share</button>
-              <button type="button" onClick={() => setLocation(`/project/${project.id}/edit`)} data-testid={`btn-edit-${project.id}`} style={actionBtnStyle}>edit</button>
-              <button type="button" onClick={() => setLocation(`/project/${project.id}`)} data-testid={`btn-detail-${project.id}`} style={actionBtnStyle}>detail</button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); const t = generateShareText(project); navigator.clipboard?.writeText(t).catch(() => {}); alert(t); }} data-testid={`btn-share-${project.id}`} style={actionBtnStyle}>share</button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setLocation(`/project/${project.id}/edit`); }} data-testid={`btn-edit-${project.id}`} style={actionBtnStyle}>edit</button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setLocation(`/project/${project.id}`); }} data-testid={`btn-detail-${project.id}`} style={actionBtnStyle}>detail</button>
               {!confirmDelete ? (
-                <button type="button" onClick={() => setConfirmDelete(true)} data-testid={`btn-hapus-${project.id}`} style={{ ...actionBtnStyle, background: "var(--red-dim)", color: "var(--red)", border: "1px solid #991b1b" }}>hapus</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }} data-testid={`btn-hapus-${project.id}`} style={{ ...actionBtnStyle, background: "var(--red-dim)", color: "var(--red)", border: "1px solid #991b1b" }}>hapus</button>
               ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={(e) => e.stopPropagation()}>
                   <span style={{ color: "var(--text-secondary)", fontSize: 11 }}>Hapus {project.name}?</span>
                   <button type="button" onClick={() => setConfirmDelete(false)} style={actionBtnStyle} data-testid={`btn-batal-${project.id}`}>Batal</button>
                   <button type="button" onClick={() => onDelete(project.id)} data-testid={`btn-confirm-hapus-${project.id}`} style={{ ...actionBtnStyle, background: "var(--red-dim)", color: "var(--red)", border: "1px solid #991b1b" }}>Hapus</button>
@@ -393,16 +386,9 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
 }
 
 const actionBtnStyle: React.CSSProperties = {
-  background: "var(--bg-elevated)",
-  color: "var(--text-secondary)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
-  padding: "0 16px",
-  height: 36,
-  fontSize: 11,
-  cursor: "pointer",
-  fontFamily: "'IBM Plex Mono', monospace",
-  minWidth: 44,
+  background: "var(--bg-elevated)", color: "var(--text-secondary)", border: "1px solid var(--border)",
+  borderRadius: 12, padding: "0 16px", height: 36, fontSize: 11, cursor: "pointer",
+  fontFamily: "'IBM Plex Mono', monospace", minWidth: 44,
 };
 
 function SettingsSheet({ onClose }: { onClose: () => void }) {
@@ -560,36 +546,42 @@ export default function Dashboard() {
   const activeCount = projects.filter((p) => p.status === "Active Play").length;
   const watchCount = projects.filter((p) => p.status === "Watchlist").length;
   const strongCount = projects.filter((p) => p.verdict === "Strong Play").length;
-  const watchVerdictCount = projects.filter((p) => p.verdict === "Watch").length;
   const ignoreCount = projects.filter((p) => p.verdict === "Ignore").length;
-  const hasVerdictPills = strongCount > 0 || watchVerdictCount > 0 || ignoreCount > 0;
 
+  // Filter dropdowns config — 2x2 grid layout
   const filterDropdowns = [
-    {
-      value: statusFilter, onChange: (v: string) => setStatusFilter(v), testId: "filter-status",
-      options: [{ value: "All", label: "All Status" }, ...STATUS_ORDER.map((s) => ({ value: s, label: s }))],
-    },
-    {
-      value: priorityFilter, onChange: (v: string) => setPriorityFilter(v), testId: "filter-priority",
-      options: [{ value: "All", label: "All Priority" }, { value: "High", label: "High" }, { value: "Medium", label: "Medium" }, { value: "Low", label: "Low" }],
-    },
-    {
-      value: playFilter, onChange: (v: string) => setPlayFilter(v), testId: "filter-play",
-      options: [{ value: "All", label: "All Play" }, { value: "Belum Ada", label: "Belum Ada" }, { value: "Segera", label: "Segera" }, { value: "Aktif", label: "Aktif" }, { value: "Selesai", label: "Selesai" }],
-    },
-    {
-      value: timingFilter, onChange: (v: string) => setTimingFilter(v), testId: "filter-timing",
-      options: [{ value: "All", label: "All Timing" }, { value: "Now", label: "Now" }, { value: "This Week", label: "This Week" }, { value: "Monitor", label: "Monitor" }, { value: "No Rush", label: "No Rush" }],
-    },
-    {
-      value: chainFilter, onChange: (v: string) => setChainFilter(v), testId: "filter-chain",
-      options: [{ value: "All", label: "All Chain" }, ...allChains.map((c) => ({ value: c, label: c }))],
-    },
+    { value: statusFilter, onChange: (v: string) => setStatusFilter(v), testId: "filter-status", options: [{ value: "All", label: "All Status" }, ...STATUS_ORDER.map((s) => ({ value: s, label: s }))] },
+    { value: priorityFilter, onChange: (v: string) => setPriorityFilter(v), testId: "filter-priority", options: [{ value: "All", label: "All Priority" }, { value: "High", label: "High" }, { value: "Medium", label: "Medium" }, { value: "Low", label: "Low" }] },
+    { value: playFilter, onChange: (v: string) => setPlayFilter(v), testId: "filter-play", options: [{ value: "All", label: "All Play" }, { value: "Belum Ada", label: "Belum Ada" }, { value: "Segera", label: "Segera" }, { value: "Aktif", label: "Aktif" }, { value: "Selesai", label: "Selesai" }] },
+    { value: timingFilter, onChange: (v: string) => setTimingFilter(v), testId: "filter-timing", options: [{ value: "All", label: "All Timing" }, { value: "Now", label: "Now" }, { value: "This Week", label: "This Week" }, { value: "Monitor", label: "Monitor" }, { value: "No Rush", label: "No Rush" }] },
+    { value: chainFilter, onChange: (v: string) => setChainFilter(v), testId: "filter-chain", options: [{ value: "All", label: "All Chain" }, ...allChains.map((c) => ({ value: c, label: c }))] },
   ];
+
+  const selectStyle: React.CSSProperties = {
+    background: "var(--bg-elevated)",
+    border: "1px solid var(--border)",
+    borderRadius: 12,
+    height: 36,
+    width: "100%",
+    padding: "0 28px 0 10px",
+    color: "var(--text-secondary)",
+    fontSize: 12,
+    fontFamily: "'IBM Plex Mono', monospace",
+    cursor: "pointer",
+    outline: "none",
+    appearance: "none",
+    WebkitAppearance: "none",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  };
 
   return (
     <div style={{ background: "var(--bg-base)", minHeight: "100vh" }}>
-      <div style={{ position: "sticky", top: 0, zIndex: 30, background: "var(--bg-base)", borderBottom: "1px solid var(--border)", padding: "12px 16px 0" }}>
+      {/* Sticky Header */}
+      <div
+        style={{ position: "sticky", top: 0, zIndex: 30, background: "var(--bg-base)", borderBottom: "1px solid var(--border)", padding: "12px 16px 0" }}
+      >
         {/* Title row */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 2 }}>
           <div>
@@ -597,31 +589,16 @@ export default function Dashboard() {
               <span style={{ color: "var(--text-primary)" }}>ALPHA</span>
               <span style={{ color: "var(--red)" }}>TRACK</span>
             </div>
-            <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 2 }}>
-              {projects.length} total · {activeCount} active · {watchCount} watch
+            {/* Subtitle — inline verdict counts */}
+            <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 2, fontFamily: "'IBM Plex Mono', monospace" }}>
+              <span>{projects.length} total · {activeCount} active · {watchCount} watch</span>
+              {strongCount > 0 && (
+                <span> · <span style={{ color: "#10b981" }}>{strongCount}◈</span></span>
+              )}
+              {ignoreCount > 0 && (
+                <span> · <span style={{ color: "#52525b" }}>{ignoreCount}ø</span></span>
+              )}
             </div>
-            {hasVerdictPills && (
-              <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
-                {strongCount > 0 && (
-                  <span style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 8px", fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", display: "flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ color: "#10b981" }}>●</span>
-                    <span style={{ color: "#10b981" }}>{strongCount} strong</span>
-                  </span>
-                )}
-                {watchVerdictCount > 0 && (
-                  <span style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 8px", fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", display: "flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ color: "#f59e0b" }}>●</span>
-                    <span style={{ color: "#f59e0b" }}>{watchVerdictCount} watch</span>
-                  </span>
-                )}
-                {ignoreCount > 0 && (
-                  <span style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 999, padding: "1px 8px", fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", display: "flex", alignItems: "center", gap: 4 }}>
-                    <span style={{ color: "#52525b" }}>●</span>
-                    <span style={{ color: "#52525b" }}>{ignoreCount} ignore</span>
-                  </span>
-                )}
-              </div>
-            )}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button type="button" onClick={() => setShowSettings(true)} data-testid="btn-settings" style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--bg-elevated)", border: "1px solid var(--border)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>
@@ -633,7 +610,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Status pills */}
+        {/* Status pills — horizontal scroll, unchanged */}
         <div className="hide-scrollbar" style={{ overflowX: "auto", display: "flex", gap: 6, paddingBottom: 10, paddingTop: 8 }}>
           {statusPills.map((pill) => (
             <button key={pill} type="button" onClick={() => { setActivePill(pill); setStatusFilter("All"); }} data-testid={`pill-${pill}`} style={{ background: activePill === pill ? "var(--red)" : "var(--bg-elevated)", color: activePill === pill ? "#fff" : "var(--text-muted)", border: `1px solid ${activePill === pill ? "var(--red)" : "var(--border)"}`, borderRadius: 999, padding: "4px 12px", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "'IBM Plex Mono', monospace", display: "flex", alignItems: "center", gap: 6 }}>
@@ -645,31 +622,44 @@ export default function Dashboard() {
 
         {/* Filter bar */}
         <div style={{ paddingBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* Search — full width */}
           <input
             type="search"
             placeholder="search name, chain, category, verdict..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             data-testid="input-search"
-            style={{ width: "100%", background: "var(--bg-input)", border: "1px solid var(--border)", borderRadius: 12, height: 40, padding: "0 12px", color: "var(--text-primary)", fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", outline: "none" }}
+            style={{ width: "100%", background: "var(--bg-input)", border: "1px solid var(--border)", borderRadius: 12, height: 40, padding: "0 12px", color: "var(--text-primary)", fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", outline: "none", boxSizing: "border-box" }}
           />
-          <div className="hide-scrollbar" style={{ overflowX: "auto", display: "flex", gap: 8 }}>
-            {filterDropdowns.map((f) => (
-              <div key={f.testId} style={{ position: "relative", flexShrink: 0 }}>
-                <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 12, height: 36, padding: "0 32px 0 12px", color: "var(--text-secondary)", fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", cursor: "pointer", outline: "none", appearance: "none", WebkitAppearance: "none" }}>
+          {/* Filter dropdowns — 2x2 grid for first 4, chain below */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {filterDropdowns.slice(0, 4).map((f) => (
+              <div key={f.testId} style={{ position: "relative" }}>
+                <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={selectStyle}>
                   {f.options.map((opt) => (
                     <option key={opt.value} value={opt.value} style={{ background: "var(--bg-elevated)" }}>{opt.label}</option>
                   ))}
                 </select>
-                <ChevronDown size={12} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
+                <ChevronDown size={11} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
               </div>
             ))}
           </div>
+          {/* Chain filter — full width below */}
+          {allChains.length > 0 && (
+            <div style={{ position: "relative" }}>
+              <select value={chainFilter} onChange={(e) => setChainFilter(e.target.value)} data-testid="filter-chain" style={{ ...selectStyle, width: "100%" }}>
+                {filterDropdowns[4].options.map((opt) => (
+                  <option key={opt.value} value={opt.value} style={{ background: "var(--bg-elevated)" }}>{opt.label}</option>
+                ))}
+              </select>
+              <ChevronDown size={11} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
+            </div>
+          )}
         </div>
       </div>
 
       {/* Card list */}
-      <div style={{ padding: "12px 12px 80px", display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ padding: "12px 12px 80px" }}>
         {filtered.length === 0 ? (
           <div style={{ textAlign: "center", paddingTop: 60 }}>
             <div style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16 }}>tidak ada project</div>
@@ -678,9 +668,11 @@ export default function Dashboard() {
             </button>
           </div>
         ) : (
-          filtered.map((project) => (
-            <ProjectCard key={project.id} project={project} onStatusChange={handleStatusChange} onDelete={handleDelete} />
-          ))
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {filtered.map((project) => (
+              <ProjectCard key={project.id} project={project} onStatusChange={handleStatusChange} onDelete={handleDelete} />
+            ))}
+          </div>
         )}
       </div>
 
