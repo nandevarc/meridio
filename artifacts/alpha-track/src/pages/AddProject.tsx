@@ -11,6 +11,16 @@ import { Field, TextInput, TextArea, Select } from "../components/FormFields";
 import { ScoreInput } from "../components/ScoreInput";
 import { ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
 
+const ACCENT       = "#4B7C6F";
+const ACCENT_LIGHT = "#EBF4F1";
+const ACCENT_BORD  = "#A7D9CE";
+const BORDER       = "#E5E7EB";
+const SURFACE      = "#FFFFFF";
+const SURF_RAISED  = "#F5F5F5";
+const TEXT_MUTED   = "#9CA3AF";
+const TEXT_PRI     = "#0A0A0A";
+const RED          = "#DC2626";
+
 interface SectionProps {
   title: string;
   children: React.ReactNode;
@@ -21,12 +31,12 @@ function Section({ title, children, defaultOpen = true }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{ marginBottom: 4 }}>
-      <button type="button" onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", cursor: "pointer", padding: "12px 0", color: "var(--text-muted)", fontSize: 11, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", cursor: "pointer", padding: "12px 0", color: TEXT_MUTED, fontSize: 11, fontFamily: "'Inter', sans-serif", fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase" }}>
         <span>// {title}</span>
         {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
       {open && <div style={{ paddingBottom: 12 }}>{children}</div>}
-      <div style={{ borderBottom: "1px solid var(--border)" }} />
+      <div style={{ borderBottom: `1px solid ${BORDER}` }} />
     </div>
   );
 }
@@ -46,7 +56,7 @@ export function VerdictPicker({ value, onChange, small }: VerdictPickerProps) {
         const isSelected = value === v;
         const s = VERDICT_STYLES[v];
         return (
-          <button key={v} type="button" onClick={() => onChange(isSelected ? null : v)} data-testid={`verdict-${v}`} style={{ flex: 1, height: h, borderRadius: 12, border: `1px solid ${isSelected ? s.border : "var(--border)"}`, background: isSelected ? s.bg : "var(--bg-elevated)", color: isSelected ? s.text : "var(--text-muted)", fontSize: small ? 11 : 12, cursor: "pointer", fontFamily: "'IBM Plex Mono', monospace", transition: "all 150ms ease" }}>
+          <button key={v} type="button" onClick={() => onChange(isSelected ? null : v)} data-testid={`verdict-${v}`} style={{ flex: 1, height: h, borderRadius: 8, border: `1px solid ${isSelected ? s.border : BORDER}`, background: isSelected ? s.bg : SURF_RAISED, color: isSelected ? s.text : TEXT_MUTED, fontSize: small ? 11 : 12, cursor: "pointer", fontFamily: "'Inter', sans-serif", transition: "all 150ms ease", fontWeight: isSelected ? 500 : 400 }}>
             {v}
           </button>
         );
@@ -68,7 +78,7 @@ export function TimingPicker({ value, onChange }: TimingPickerProps) {
         const isSelected = value === v;
         const s = TIMING_STYLES[v];
         return (
-          <button key={v} type="button" onClick={() => onChange(isSelected ? null : v)} data-testid={`timing-${v}`} style={{ flex: 1, minWidth: 70, height: 40, borderRadius: 12, border: `1px solid ${isSelected ? s.border : "var(--border)"}`, background: isSelected ? s.bg : "var(--bg-elevated)", color: isSelected ? s.text : "var(--text-muted)", fontSize: 12, cursor: "pointer", fontFamily: "'IBM Plex Mono', monospace", transition: "all 150ms ease" }}>
+          <button key={v} type="button" onClick={() => onChange(isSelected ? null : v)} data-testid={`timing-${v}`} style={{ flex: 1, minWidth: 70, height: 40, borderRadius: 8, border: `1px solid ${isSelected ? s.border : BORDER}`, background: isSelected ? s.bg : SURF_RAISED, color: isSelected ? s.text : TEXT_MUTED, fontSize: 12, cursor: "pointer", fontFamily: "'Inter', sans-serif", transition: "all 150ms ease", fontWeight: isSelected ? 500 : 400 }}>
             {v}
           </button>
         );
@@ -91,6 +101,20 @@ function makeDefault(): Partial<Project> {
     timingWindow: null, reasonToDrop: "", biaCheck: "",
   };
 }
+
+const dateInputStyle: React.CSSProperties = {
+  background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 8,
+  padding: "0 12px", color: TEXT_PRI, fontSize: 14,
+  fontFamily: "'Inter', sans-serif", width: "100%", outline: "none",
+  height: 40, boxSizing: "border-box",
+};
+
+const ctCountInputStyle: React.CSSProperties = {
+  background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 8,
+  padding: "0 12px", color: TEXT_PRI, fontSize: 14,
+  fontFamily: "'Inter', sans-serif", width: "100%", outline: "none",
+  height: 40, boxSizing: "border-box",
+};
 
 export default function AddProject() {
   const [, setLocation] = useLocation();
@@ -159,38 +183,32 @@ export default function AddProject() {
     setLocation("/");
   }
 
-  const dateInputStyle: React.CSSProperties = {
-    background: "var(--bg-input)", border: "1px solid var(--border)", borderRadius: 12,
-    padding: "10px 12px", color: "var(--text-primary)", fontSize: 13,
-    fontFamily: "'IBM Plex Mono', monospace", width: "100%", outline: "none",
-    minHeight: 44, colorScheme: "dark",
-  };
-
   return (
-    <div style={{ background: "var(--bg-base)", minHeight: "100vh", paddingBottom: 120 }}>
-      <div style={{ position: "sticky", top: 0, zIndex: 30, background: "var(--bg-base)", borderBottom: "1px solid var(--border)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-        <button type="button" onClick={() => setLocation("/")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", alignItems: "center", padding: 4 }} data-testid="btn-back">
+    <div style={{ background: "#FAFAFA", minHeight: "100vh", paddingBottom: 120 }}>
+      {/* Header */}
+      <div style={{ position: "sticky", top: 0, zIndex: 30, background: SURFACE, borderBottom: `1px solid ${BORDER}`, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+        <button type="button" onClick={() => setLocation("/")} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, display: "flex", alignItems: "center", padding: 4 }} data-testid="btn-back">
           <ArrowLeft size={18} />
         </button>
-        <span className="syne" style={{ fontWeight: 800, fontSize: 16, color: "var(--text-primary)" }}>Tambah Project</span>
-        <div style={{ marginLeft: "auto", display: "flex", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-          <button type="button" onClick={() => setMode("quick")} data-testid="btn-mode-quick" style={{ background: mode === "quick" ? "var(--red)" : "var(--bg-elevated)", color: mode === "quick" ? "#fff" : "var(--text-muted)", border: "none", padding: "6px 12px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono', monospace" }}>Mode Cepat</button>
-          <button type="button" onClick={() => setMode("full")} data-testid="btn-mode-full" style={{ background: mode === "full" ? "var(--red)" : "var(--bg-elevated)", color: mode === "full" ? "#fff" : "var(--text-muted)", border: "none", padding: "6px 12px", fontSize: 11, cursor: "pointer", fontFamily: "'IBM Plex Mono', monospace" }}>Form Lengkap</button>
+        <span className="syne" style={{ fontWeight: 800, fontSize: 16, color: TEXT_PRI }}>Tambah Project</span>
+        <div style={{ marginLeft: "auto", display: "flex", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
+          <button type="button" onClick={() => setMode("quick")} data-testid="btn-mode-quick" style={{ background: mode === "quick" ? ACCENT : SURF_RAISED, color: mode === "quick" ? "#fff" : TEXT_MUTED, border: "none", padding: "6px 14px", fontSize: 12, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: mode === "quick" ? 600 : 400 }}>Mode Cepat</button>
+          <button type="button" onClick={() => setMode("full")} data-testid="btn-mode-full" style={{ background: mode === "full" ? ACCENT : SURF_RAISED, color: mode === "full" ? "#fff" : TEXT_MUTED, border: "none", padding: "6px 14px", fontSize: 12, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: mode === "full" ? 600 : 400 }}>Form Lengkap</button>
         </div>
       </div>
 
       <div style={{ padding: "16px 16px 0" }}>
         {/* Reason to Drop — conditional top block */}
         {showReasonToDrop && (
-          <div style={{ borderLeft: "3px solid #dc2626", background: "#110000", padding: 12, borderRadius: 12, marginBottom: 16 }}>
-            <div style={{ color: "#dc2626", fontSize: 11, textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Reason to Drop</div>
+          <div style={{ borderLeft: `3px solid ${RED}`, background: "#FFF5F5", padding: 12, borderRadius: 8, marginBottom: 16 }}>
+            <div style={{ color: RED, fontSize: 11, textTransform: "uppercase", fontWeight: 600, marginBottom: 8, letterSpacing: "0.07em" }}>Reason to Drop</div>
             <textarea
               value={form.reasonToDrop ?? ""}
               onChange={(e) => set("reasonToDrop", e.target.value)}
               rows={2}
               placeholder="No builder, no traction, hype only, copy-paste..."
               data-testid="input-reason-to-drop"
-              style={{ width: "100%", background: "#1a0000", border: "1px solid #3a0000", borderRadius: 10, padding: "10px 12px", color: "var(--text-primary)", fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+              style={{ width: "100%", background: SURFACE, border: `1px solid #FECACA`, borderRadius: 8, padding: "10px 12px", color: TEXT_PRI, fontSize: 13, fontFamily: "'Inter', sans-serif", outline: "none", resize: "vertical", boxSizing: "border-box" }}
             />
           </div>
         )}
@@ -259,37 +277,20 @@ export default function AddProject() {
               <Field label="Builder & Team"><TextArea value={form.builder ?? ""} onChange={(v) => set("builder", v)} rows={2} placeholder="nama: @handle, afiliasi: ..." data-testid="input-builder" /></Field>
               <Field label="CT Signal"><TextInput value={form.ctSignal ?? ""} onChange={(v) => set("ctSignal", v)} placeholder="Guar Emperor, JG, Bitman..." data-testid="input-ct-signal" /></Field>
               <div style={{ marginBottom: 16 }}>
-                <label style={{ color: "var(--text-muted)", fontSize: 11, display: "block", marginBottom: 2, fontWeight: 600 }}>CT Count</label>
-                <div style={{ color: "var(--text-muted)", fontSize: 10, marginBottom: 6 }}>berapa CT yang follow atau mention project ini</div>
-                <input
-                  type="number"
-                  min={0}
-                  max={999}
-                  value={form.ctCount ?? ""}
-                  onChange={(e) => set("ctCount", e.target.value === "" ? null : Number(e.target.value))}
-                  placeholder="0"
-                  data-testid="input-ct-count"
-                  style={{ background: "var(--bg-input)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", color: "var(--text-primary)", fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", width: "100%", outline: "none", minHeight: 44, boxSizing: "border-box" }}
-                />
+                <label style={{ color: TEXT_MUTED, fontSize: 11, display: "block", marginBottom: 2, fontWeight: 500, letterSpacing: "0.07em", textTransform: "uppercase" }}>CT Count</label>
+                <div style={{ color: TEXT_MUTED, fontSize: 11, marginBottom: 6 }}>berapa CT yang follow atau mention project ini</div>
+                <input type="number" min={0} max={999} value={form.ctCount ?? ""} onChange={(e) => set("ctCount", e.target.value === "" ? null : Number(e.target.value))} placeholder="0" data-testid="input-ct-count" style={ctCountInputStyle} />
               </div>
               <Field label="Conviction">
                 <Select value={form.conviction ?? "Medium"} onChange={(v) => set("conviction", v as Conviction)} options={["Low", "Medium", "High"].map((s) => ({ value: s, label: s }))} data-testid="select-conviction" />
               </Field>
               <Field label="Score Breakdown">
-                <ScoreInput
-                  scoreNarrative={form.scoreNarrative ?? null}
-                  scoreBuilder={form.scoreBuilder ?? null}
-                  scoreCT={form.scoreCT ?? null}
-                  scoreTiming={form.scoreTiming ?? null}
-                  scoreExecution={form.scoreExecution ?? null}
-                  ctCount={form.ctCount ?? null}
-                  onChange={(key, val) => set(key, val as never)}
-                />
+                <ScoreInput scoreNarrative={form.scoreNarrative ?? null} scoreBuilder={form.scoreBuilder ?? null} scoreCT={form.scoreCT ?? null} scoreTiming={form.scoreTiming ?? null} scoreExecution={form.scoreExecution ?? null} ctCount={form.ctCount ?? null} onChange={(key, val) => set(key, val as never)} />
               </Field>
               <Field label="Decision Note"><TextArea value={form.decisionNote ?? ""} onChange={(v) => set("decisionNote", v)} rows={2} placeholder="Catatan keputusan..." data-testid="input-decision-note" /></Field>
               <div style={{ marginBottom: 16 }}>
-                <label style={{ color: "var(--text-muted)", fontSize: 11, display: "block", marginBottom: 2, fontWeight: 600 }}>Bias Check</label>
-                <div style={{ color: "var(--text-muted)", fontSize: 10, marginBottom: 6 }}>kenapa ini bisa salah?</div>
+                <label style={{ color: TEXT_MUTED, fontSize: 11, display: "block", marginBottom: 2, fontWeight: 500, letterSpacing: "0.07em", textTransform: "uppercase" }}>Bias Check</label>
+                <div style={{ color: TEXT_MUTED, fontSize: 11, marginBottom: 6 }}>kenapa ini bisa salah?</div>
                 <TextArea value={form.biaCheck ?? ""} onChange={(v) => set("biaCheck", v)} rows={2} placeholder="red flag yang saya abaikan? kenapa ini bisa fail?" data-testid="input-bia-check" />
               </div>
             </Section>
@@ -321,10 +322,11 @@ export default function AddProject() {
         )}
       </div>
 
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "var(--bg-base)", borderTop: "1px solid var(--border)", padding: 16, zIndex: 30, maxWidth: 480, margin: "0 auto", boxSizing: "border-box", width: "100%" }}>
-        <button type="button" onClick={handleSave} data-testid="btn-simpan" style={{ width: "100%", height: 48, background: "var(--red)", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 500, cursor: "pointer" }}>Simpan</button>
-        <div style={{ textAlign: "center", marginTop: 8 }}>
-          <button type="button" onClick={() => setLocation("/")} data-testid="btn-batal" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>Batal</button>
+      {/* Sticky bottom bar */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: SURFACE, borderTop: `1px solid ${BORDER}`, padding: 16, zIndex: 30, maxWidth: 480, margin: "0 auto", boxSizing: "border-box", width: "100%", boxShadow: "0 -2px 8px rgba(0,0,0,0.06)" }}>
+        <button type="button" onClick={handleSave} data-testid="btn-simpan" style={{ width: "100%", height: 48, background: ACCENT, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontFamily: "'Inter', sans-serif", fontWeight: 600, cursor: "pointer", boxShadow: "0 2px 8px rgba(75,124,111,0.25)" }}>Simpan</button>
+        <div style={{ textAlign: "center", marginTop: 10 }}>
+          <button type="button" onClick={() => setLocation("/")} data-testid="btn-batal" style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, fontSize: 13 }}>Batal</button>
         </div>
       </div>
     </div>

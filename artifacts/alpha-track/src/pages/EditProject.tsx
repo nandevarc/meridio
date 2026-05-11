@@ -12,6 +12,14 @@ import { ScoreInput } from "../components/ScoreInput";
 import { VerdictPicker, TimingPicker } from "./AddProject";
 import { ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
 
+const ACCENT     = "#4B7C6F";
+const BORDER     = "#E5E7EB";
+const SURFACE    = "#FFFFFF";
+const SURF_RAISED = "#F5F5F5";
+const TEXT_PRI   = "#0A0A0A";
+const TEXT_MUTED = "#9CA3AF";
+const RED        = "#DC2626";
+
 interface SectionProps {
   title: string;
   children: React.ReactNode;
@@ -22,12 +30,12 @@ function Section({ title, children, defaultOpen = true }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{ marginBottom: 4 }}>
-      <button type="button" onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", cursor: "pointer", padding: "12px 0", color: "var(--text-muted)", fontSize: 11, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", cursor: "pointer", padding: "12px 0", color: TEXT_MUTED, fontSize: 11, fontFamily: "'Inter', sans-serif", fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase" }}>
         <span>// {title}</span>
         {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
       {open && <div style={{ paddingBottom: 12 }}>{children}</div>}
-      <div style={{ borderBottom: "1px solid var(--border)" }} />
+      <div style={{ borderBottom: `1px solid ${BORDER}` }} />
     </div>
   );
 }
@@ -46,8 +54,8 @@ export default function EditProject({ id }: Props) {
 
   if (!form) {
     return (
-      <div style={{ background: "var(--bg-base)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "var(--text-muted)" }}>project tidak ditemukan</div>
+      <div style={{ background: "#FAFAFA", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: TEXT_MUTED }}>project tidak ditemukan</div>
       </div>
     );
   }
@@ -68,45 +76,41 @@ export default function EditProject({ id }: Props) {
       scoreTiming: form.scoreTiming,
       scoreExecution: form.scoreExecution,
     });
-    const updated: Project = {
-      ...form,
-      name: form.name.trim(),
-      quickScore: qs,
-      updatedAt: new Date().toISOString(),
-    };
+    const updated: Project = { ...form, name: form.name.trim(), quickScore: qs, updatedAt: new Date().toISOString() };
     updateProject(updated);
     showToast("project disimpan");
     setLocation(`/project/${id}`);
   }
 
   const dateInputStyle: React.CSSProperties = {
-    background: "var(--bg-input)", border: "1px solid var(--border)", borderRadius: 12,
-    padding: "10px 12px", color: "var(--text-primary)", fontSize: 13,
-    fontFamily: "'IBM Plex Mono', monospace", width: "100%", outline: "none",
-    minHeight: 44, colorScheme: "dark",
+    background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 8,
+    padding: "0 12px", color: TEXT_PRI, fontSize: 14,
+    fontFamily: "'Inter', sans-serif", width: "100%", outline: "none",
+    height: 40, boxSizing: "border-box",
   };
 
   return (
-    <div style={{ background: "var(--bg-base)", minHeight: "100vh", paddingBottom: 120 }}>
-      <div style={{ position: "sticky", top: 0, zIndex: 30, background: "var(--bg-base)", borderBottom: "1px solid var(--border)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-        <button type="button" onClick={() => setLocation(`/project/${id}`)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", alignItems: "center", padding: 4 }} data-testid="btn-back">
+    <div style={{ background: "#FAFAFA", minHeight: "100vh", paddingBottom: 120 }}>
+      {/* Header */}
+      <div style={{ position: "sticky", top: 0, zIndex: 30, background: SURFACE, borderBottom: `1px solid ${BORDER}`, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+        <button type="button" onClick={() => setLocation(`/project/${id}`)} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, display: "flex", alignItems: "center", padding: 4 }} data-testid="btn-back">
           <ArrowLeft size={18} />
         </button>
-        <span className="syne" style={{ fontWeight: 800, fontSize: 16, color: "var(--text-primary)" }}>Edit Project</span>
+        <span className="syne" style={{ fontWeight: 800, fontSize: 16, color: TEXT_PRI }}>Edit Project</span>
       </div>
 
       <div style={{ padding: "16px 16px 0" }}>
         {/* Reason to Drop — conditional top block */}
         {showReasonToDrop && (
-          <div style={{ borderLeft: "3px solid #dc2626", background: "#110000", padding: 12, borderRadius: 12, marginBottom: 16 }}>
-            <div style={{ color: "#dc2626", fontSize: 11, textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Reason to Drop</div>
+          <div style={{ borderLeft: `3px solid ${RED}`, background: "#FFF5F5", padding: 12, borderRadius: 8, marginBottom: 16 }}>
+            <div style={{ color: RED, fontSize: 11, textTransform: "uppercase", fontWeight: 600, marginBottom: 8, letterSpacing: "0.07em" }}>Reason to Drop</div>
             <textarea
               value={form.reasonToDrop ?? ""}
               onChange={(e) => set("reasonToDrop", e.target.value)}
               rows={2}
               placeholder="No builder, no traction, hype only, copy-paste..."
               data-testid="input-reason-to-drop"
-              style={{ width: "100%", background: "#1a0000", border: "1px solid #3a0000", borderRadius: 10, padding: "10px 12px", color: "var(--text-primary)", fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+              style={{ width: "100%", background: SURFACE, border: "1px solid #FECACA", borderRadius: 8, padding: "10px 12px", color: TEXT_PRI, fontSize: 13, fontFamily: "'Inter', sans-serif", outline: "none", resize: "vertical", boxSizing: "border-box" }}
             />
           </div>
         )}
@@ -136,28 +140,20 @@ export default function EditProject({ id }: Props) {
           <Field label="Builder & Team"><TextArea value={form.builder} onChange={(v) => set("builder", v)} rows={2} placeholder="nama: @handle, afiliasi: ..." data-testid="input-builder" /></Field>
           <Field label="CT Signal"><TextInput value={form.ctSignal} onChange={(v) => set("ctSignal", v)} placeholder="Guar Emperor, JG, Bitman..." data-testid="input-ct-signal" /></Field>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 11, display: "block", marginBottom: 2, fontWeight: 600 }}>CT Count</label>
-            <div style={{ color: "var(--text-muted)", fontSize: 10, marginBottom: 6 }}>berapa CT yang follow atau mention project ini</div>
-            <input type="number" min={0} max={999} value={form.ctCount ?? ""} onChange={(e) => set("ctCount", e.target.value === "" ? null : Number(e.target.value))} placeholder="0" data-testid="input-ct-count" style={{ background: "var(--bg-input)", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", color: "var(--text-primary)", fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", width: "100%", outline: "none", minHeight: 44, boxSizing: "border-box" }} />
+            <label style={{ color: TEXT_MUTED, fontSize: 11, display: "block", marginBottom: 2, fontWeight: 500, letterSpacing: "0.07em", textTransform: "uppercase" }}>CT Count</label>
+            <div style={{ color: TEXT_MUTED, fontSize: 11, marginBottom: 6 }}>berapa CT yang follow atau mention project ini</div>
+            <input type="number" min={0} max={999} value={form.ctCount ?? ""} onChange={(e) => set("ctCount", e.target.value === "" ? null : Number(e.target.value))} placeholder="0" data-testid="input-ct-count" style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "0 12px", color: TEXT_PRI, fontSize: 14, fontFamily: "'Inter', sans-serif", width: "100%", outline: "none", height: 40, boxSizing: "border-box" }} />
           </div>
           <Field label="Conviction">
             <Select value={form.conviction} onChange={(v) => set("conviction", v as Conviction)} options={["Low", "Medium", "High"].map((s) => ({ value: s, label: s }))} data-testid="select-conviction" />
           </Field>
           <Field label="Score Breakdown">
-            <ScoreInput
-              scoreNarrative={form.scoreNarrative}
-              scoreBuilder={form.scoreBuilder}
-              scoreCT={form.scoreCT}
-              scoreTiming={form.scoreTiming}
-              scoreExecution={form.scoreExecution}
-              ctCount={form.ctCount}
-              onChange={(key, val) => set(key, val as never)}
-            />
+            <ScoreInput scoreNarrative={form.scoreNarrative} scoreBuilder={form.scoreBuilder} scoreCT={form.scoreCT} scoreTiming={form.scoreTiming} scoreExecution={form.scoreExecution} ctCount={form.ctCount} onChange={(key, val) => set(key, val as never)} />
           </Field>
           <Field label="Decision Note"><TextArea value={form.decisionNote} onChange={(v) => set("decisionNote", v)} rows={2} placeholder="Catatan keputusan..." data-testid="input-decision-note" /></Field>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ color: "var(--text-muted)", fontSize: 11, display: "block", marginBottom: 2, fontWeight: 600 }}>Bias Check</label>
-            <div style={{ color: "var(--text-muted)", fontSize: 10, marginBottom: 6 }}>kenapa ini bisa salah?</div>
+            <label style={{ color: TEXT_MUTED, fontSize: 11, display: "block", marginBottom: 2, fontWeight: 500, letterSpacing: "0.07em", textTransform: "uppercase" }}>Bias Check</label>
+            <div style={{ color: TEXT_MUTED, fontSize: 11, marginBottom: 6 }}>kenapa ini bisa salah?</div>
             <TextArea value={form.biaCheck ?? ""} onChange={(v) => set("biaCheck", v)} rows={2} placeholder="red flag yang saya abaikan? kenapa ini bisa fail?" data-testid="input-bia-check" />
           </div>
         </Section>
@@ -186,15 +182,16 @@ export default function EditProject({ id }: Props) {
           </Field>
         </Section>
 
-        <div style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 16, textAlign: "center" }}>
+        <div style={{ color: TEXT_MUTED, fontSize: 11, marginTop: 16, textAlign: "center" }}>
           Last Updated: {formatDateTime(form.updatedAt)}
         </div>
       </div>
 
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "var(--bg-base)", borderTop: "1px solid var(--border)", padding: 16, zIndex: 30, maxWidth: 480, margin: "0 auto", boxSizing: "border-box", width: "100%" }}>
-        <button type="button" onClick={handleSave} data-testid="btn-simpan" style={{ width: "100%", height: 48, background: "var(--red)", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontFamily: "'IBM Plex Mono', monospace", fontWeight: 500, cursor: "pointer" }}>Simpan</button>
-        <div style={{ textAlign: "center", marginTop: 8 }}>
-          <button type="button" onClick={() => setLocation(`/project/${id}`)} data-testid="btn-batal" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>Batal</button>
+      {/* Sticky bottom bar */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: SURFACE, borderTop: `1px solid ${BORDER}`, padding: 16, zIndex: 30, maxWidth: 480, margin: "0 auto", boxSizing: "border-box", width: "100%", boxShadow: "0 -2px 8px rgba(0,0,0,0.06)" }}>
+        <button type="button" onClick={handleSave} data-testid="btn-simpan" style={{ width: "100%", height: 48, background: ACCENT, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontFamily: "'Inter', sans-serif", fontWeight: 600, cursor: "pointer", boxShadow: "0 2px 8px rgba(75,124,111,0.25)" }}>Simpan</button>
+        <div style={{ textAlign: "center", marginTop: 10 }}>
+          <button type="button" onClick={() => setLocation(`/project/${id}`)} data-testid="btn-batal" style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, fontSize: 13 }}>Batal</button>
         </div>
       </div>
     </div>

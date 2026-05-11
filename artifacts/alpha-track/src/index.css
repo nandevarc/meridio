@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
 
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -6,57 +6,66 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --color-background: var(--bg-base);
+  --color-background: var(--background);
   --color-foreground: var(--text-primary);
   --color-border: var(--border);
-  --color-input: var(--bg-input);
-  --color-ring: var(--border-focus);
-  --color-card: var(--bg-surface);
+  --color-input: var(--surface);
+  --color-ring: var(--accent);
+  --color-card: var(--surface);
   --color-card-foreground: var(--text-primary);
-  --color-card-border: var(--border);
-  --color-popover: var(--bg-elevated);
+  --color-popover: var(--surface);
   --color-popover-foreground: var(--text-primary);
-  --color-popover-border: var(--border);
-  --color-primary: var(--red);
-  --color-primary-foreground: #ffffff;
-  --color-secondary: var(--bg-elevated);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-foreground);
+  --color-secondary: var(--surface-raised);
   --color-secondary-foreground: var(--text-secondary);
-  --color-muted: var(--bg-elevated);
+  --color-muted: var(--surface-raised);
   --color-muted-foreground: var(--text-muted);
-  --color-accent: var(--bg-elevated);
+  --color-accent: var(--surface-raised);
   --color-accent-foreground: var(--text-secondary);
-  --color-destructive: var(--red);
+  --color-destructive: var(--destructive);
   --color-destructive-foreground: #ffffff;
-  --font-sans: 'IBM Plex Mono', monospace;
+  --font-sans: 'Inter', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
 }
 
 :root {
-  --bg-base: #080808;
-  --bg-surface: #0f0f0f;
-  --bg-elevated: #161616;
-  --bg-input: #1a1a1a;
-  --border: #222222;
-  --border-focus: #3a3a3a;
-  --text-primary: #f0f0f0;
-  --text-secondary: #888888;
-  --text-muted: #444444;
+  --background: #FAFAFA;
+  --surface: #FFFFFF;
+  --surface-raised: #F5F5F5;
+  --border: #E5E7EB;
+  --border-subtle: #F0F0F0;
+  --text-primary: #0A0A0A;
+  --text-secondary: #6B7280;
+  --text-muted: #9CA3AF;
+  --accent: #4B7C6F;
+  --accent-light: #EBF4F1;
+  --accent-foreground: #FFFFFF;
+  --destructive: #DC2626;
+  --warning: #D97706;
+  --radius: 8px;
 
-  --red: #dc2626;
-  --red-dim: #7f1d1d;
-  --emerald: #10b981;
-  --emerald-dim: #064e3b;
-  --amber: #f59e0b;
-  --amber-dim: #78350f;
-  --blue: #3b82f6;
-  --blue-dim: #1e3a5f;
-  --purple: #a855f7;
-  --purple-dim: #3b0764;
-  --zinc: #52525b;
+  /* Legacy aliases — existing var() refs auto-update */
+  --bg-base: var(--background);
+  --bg-surface: var(--surface);
+  --bg-elevated: var(--surface-raised);
+  --bg-input: var(--surface);
+  --border-focus: var(--accent);
+  --red: var(--destructive);
+  --red-dim: #FEF2F2;
+  --emerald: var(--accent);
+  --emerald-dim: var(--accent-light);
+  --amber: #D97706;
+  --amber-dim: #FFFBEB;
+  --blue: #2563EB;
+  --blue-dim: #EFF6FF;
+  --purple: #7C3AED;
+  --purple-dim: #F5F3FF;
+  --zinc: #9CA3AF;
 }
 
 * {
@@ -65,22 +74,23 @@
 }
 
 html, body {
-  background-color: var(--bg-base);
+  background-color: var(--background);
   color: var(--text-primary);
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {
   min-height: 100vh;
-  background-color: var(--bg-base);
+  background-color: var(--background);
 }
 
 input, textarea, select, button {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Inter', sans-serif;
 }
 
 input:focus, textarea:focus, select:focus {
@@ -100,7 +110,7 @@ input:focus, textarea:focus, select:focus {
   scrollbar-width: none;
 }
 
-/* Thin red scrollbar on overflow-y containers */
+/* Thin accent scrollbar on overflow-y containers */
 .thin-scrollbar::-webkit-scrollbar {
   width: 2px;
 }
@@ -108,7 +118,7 @@ input:focus, textarea:focus, select:focus {
   background: transparent;
 }
 .thin-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--red);
+  background: var(--accent);
   border-radius: 1px;
 }
 
