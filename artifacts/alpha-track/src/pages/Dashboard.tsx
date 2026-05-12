@@ -5,9 +5,10 @@ import {
   STATUS_ORDER, STATUS_STYLES, PRIORITY_COLORS, PLAY_STATUS_COLORS,
   VERDICT_STYLES, computeQuickScore,
 } from "../types";
-import { getProjects, updateProject, deleteProject, saveProjects } from "../utils/storage";
+import { getProjects, updateProject, deleteProject } from "../utils/storage";
+import { getAllProjects, saveAllProjects } from "../lib/storage";
+import { exportBackup, importBackup } from "../lib/exportImport";
 import { useToast } from "../context/ToastContext";
-import { STORAGE_KEY } from "../types";
 import { Settings, Plus, ChevronDown, ChevronUp, ExternalLink, Search } from "lucide-react";
 
 // ── Design tokens ─────────────────────────────────────────────────
@@ -25,7 +26,7 @@ const RED          = "#DC2626";
 const RED_LIGHT    = "#FEF2F2";
 const RED_BORD     = "#FECACA";
 
-// ── Timing left border colors (Step 2) ───────────────────────────
+// ── Timing left border colors ─────────────────────────────────────
 const TIMING_LEFT_BORDER: Record<string, string> = {
   "Now":       "#F87171",
   "This Week": "#FBBF24",
@@ -33,7 +34,7 @@ const TIMING_LEFT_BORDER: Record<string, string> = {
   "No Rush":   "#E5E7EB",
 };
 
-// ── Timing badge colors — vivid for fast scanning (Step 2) ───────
+// ── Timing badge colors ───────────────────────────────────────────
 const TIMING_BADGE: Record<string, { bg: string; text: string; border: string }> = {
   "Now":       { bg: "#FEE2E2", text: "#B91C1C", border: "#FECACA" },
   "This Week": { bg: "#FEF3C7", text: "#B45309", border: "#FDE68A" },
@@ -68,19 +69,19 @@ function generateShareText(project: Project): string {
   lines.push("");
   const desc = project.narrative || project.description;
   if (desc) lines.push(desc);
-  if (project.builder) lines.push(`Builder: ${project.builder}`);
-  if (project.ctSignal) {
-    const ctPart = (project.ctCount != null && project.ctCount > 0) ? ` (${project.ctCount}×)` : "";
-    lines.push(`CT Signal: ${project.ctSignal}${ctPart}`);
+  if (project.builders.length) lines.push(`Builder: ${project.builders.join(", ")}`);
+  if (project.ct.names.length) {
+    const ctPart = project.ct.count > 0 ? ` (${project.ct.count}×)` : "";
+    lines.push(`CT Signal: ${project.ct.names.join(", ")}${ctPart}`);
   }
   if (project.actionRequired) lines.push(`Play: ${project.actionRequired}`);
-  if (project.playTypes.length) lines.push(`Type: ${project.playTypes.join(", ")}`);
+  if (project.playType.length) lines.push(`Type: ${project.playType.join(", ")}`);
   if (project.timingWindow) lines.push(`Timing: ${project.timingWindow}`);
-  const qs = computeQuickScore(project);
+  const qs = computeQuickScore(project.scores);
   if (qs !== null) lines.push(`Score: ${qs}/25`);
   if (project.verdict) lines.push(`Verdict: ${project.verdict}`);
-  if (project.website) lines.push(project.website);
-  if (project.twitter) lines.push(project.twitter);
+  if (project.links.website) lines.push(project.links.website);
+  if (project.links.twitter) lines.push(project.links.twitter);
   return lines.join("\n");
 }
 
@@ -148,20 +149,16 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
   const [showFullNarr, setShowFullNarr] = useState(false);
   const [, setLocation] = useLocation();
 
-  const qs = computeQuickScore(project);
+  const qs = computeQuickScore(project.scores);
   const isDimmed     = project.verdict === "Ignore" || project.status === "Skip";
   const isHighScore  = !isDimmed && qs !== null && qs >= 18;
   const isStrongPlay = !isDimmed && project.verdict === "Strong Play";
   const isActiveHigh = !isDimmed && project.status === "Active Play" && project.priority === "High";
 
-  // Card background — high score gets accent tint
   let cardBg = SURFACE;
   let cardBorderColor = BORDER;
-  if (!isDimmed) {
-    if (isHighScore) { cardBg = ACCENT_LIGHT; cardBorderColor = ACCENT_BORD; }
-  }
+  if (!isDimmed && isHighScore) { cardBg = ACCENT_LIGHT; cardBorderColor = ACCENT_BORD; }
 
-  // Timing left border (Step 2 primary signal)
   const timingLeftColor = (!isDimmed && project.timingWindow)
     ? (TIMING_LEFT_BORDER[project.timingWindow] ?? "transparent")
     : "transparent";
@@ -174,11 +171,11 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
   else if (isStrongPlay) nameColor = ACCENT;
 
   const links = [
-    { key: "website",  label: "web",     url: project.website  },
-    { key: "twitter",  label: "X",       url: project.twitter  },
-    { key: "discord",  label: "discord", url: project.discord  },
-    { key: "telegram", label: "tg",      url: project.telegram },
-    { key: "github",   label: "gh",      url: project.github   },
+    { key: "website",  label: "web",     url: project.links.website  },
+    { key: "twitter",  label: "X",       url: project.links.twitter  },
+    { key: "discord",  label: "discord", url: project.links.discord  },
+    { key: "telegram", label: "tg",      url: project.links.telegram },
+    { key: "github",   label: "gh",      url: project.links.github   },
   ].filter((l) => l.url);
 
   const actionText    = project.actionRequired || "";
@@ -186,15 +183,12 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
   const showActionRow = actionText !== "" || playNotesText !== "";
   const actionRowText = actionText || playNotesText;
 
-  // Step 2: CT row shows count only; hidden if count = 0/null
-  const ctCount       = project.ctCount ?? 0;
-  const showCTRow     = ctCount > 0;
-  const showPlayBadge = !isDimmed && (project.playStatus === "Aktif" || project.playStatus === "Segera");
+  const ctCount   = project.ct.count;
+  const showCTRow = ctCount > 0;
+  const showPlayBadge = !isDimmed && project.playStatus === "Aktif";
 
-  // Expanded section flags
-  const hasAnalysis    = !!(project.description || project.narrative || project.builder
-    || project.ctSignal || (project.ctCount != null && project.ctCount > 0)
-    || project.decisionNote);
+  const hasAnalysis    = !!(project.description || project.narrative || project.builders.length > 0
+    || project.ct.names.length > 0 || project.ct.count > 0 || project.decisionNote);
   const hasPlayDetail  = !!(project.playNotes || (project.playStatus && project.playStatus !== "Belum Ada"));
   const hasLinksSource = links.length > 0 || !!project.source;
 
@@ -216,7 +210,7 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
       {/* ── Collapsed area ───────────────────────────────────── */}
       <div onClick={() => setExpanded((e) => !e)} style={{ padding: "12px 12px 10px", cursor: "pointer", userSelect: "none" }}>
 
-        {/* Row 1: priority dot + timing badge + name + verdict + chevron + status */}
+        {/* Row 1 */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, gap: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
             <div
@@ -278,7 +272,7 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
           </div>
         )}
 
-        {/* Row 3 — CT count + play badge + score pill */}
+        {/* Row 3 — CT + play badge + score */}
         {(showCTRow || showPlayBadge || qs !== null) && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             {showCTRow && (
@@ -326,22 +320,17 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
       }}>
         <div style={{ padding: "10px 12px 4px" }}>
 
-          {/* Always visible: play type badges */}
-          {project.playTypes.length > 0 && (
+          {project.playType.length > 0 && (
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
-              {project.playTypes.map((pt) => (
+              {project.playType.map((pt) => (
                 <span key={pt} style={{ background: ACCENT_LIGHT, color: ACCENT, border: `1px solid ${ACCENT_BORD}`, borderRadius: 4, padding: "2px 8px", fontSize: 11, fontWeight: 500 }}>{pt}</span>
               ))}
             </div>
           )}
 
-          {/* Collapsible: Analysis */}
+          {/* Analysis */}
           {hasAnalysis && (
-            <CollapsibleSection
-              label="Analysis"
-              open={sectionOpen.analysis}
-              onToggle={() => setSectionOpen((s) => ({ ...s, analysis: !s.analysis }))}
-            >
+            <CollapsibleSection label="Analysis" open={sectionOpen.analysis} onToggle={() => setSectionOpen((s) => ({ ...s, analysis: !s.analysis }))}>
               {project.description && (
                 <div style={{ marginBottom: 8 }}>
                   <div style={{ color: TEXT_MUTED, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Description</div>
@@ -364,19 +353,19 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
                   )}
                 </div>
               )}
-              {project.builder && (
+              {project.builders.length > 0 && (
                 <div style={{ marginBottom: 8 }}>
                   <div style={{ color: TEXT_MUTED, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Builder & Team</div>
-                  <div style={{ color: TEXT_PRI, fontSize: 13 }}>{project.builder}</div>
+                  <div style={{ color: TEXT_PRI, fontSize: 13 }}>{project.builders.join(", ")}</div>
                 </div>
               )}
-              {(project.ctSignal || (project.ctCount != null && project.ctCount > 0)) && (
+              {(project.ct.names.length > 0 || project.ct.count > 0) && (
                 <div style={{ marginBottom: 8 }}>
                   <div style={{ color: TEXT_MUTED, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>CT Signal</div>
                   <div style={{ color: TEXT_PRI, fontSize: 13 }}>
-                    {project.ctSignal}
-                    {project.ctCount != null && project.ctCount > 0 && (
-                      <span> · <span style={{ color: RED, fontWeight: 600 }}>{project.ctCount}×</span></span>
+                    {project.ct.names.join(", ")}
+                    {project.ct.count > 0 && (
+                      <span> · <span style={{ color: RED, fontWeight: 600 }}>{project.ct.count}×</span></span>
                     )}
                   </div>
                 </div>
@@ -387,22 +376,12 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
                   <div style={{ color: TEXT_PRI, fontSize: 13 }}>{project.decisionNote}</div>
                 </div>
               )}
-              {project.reasonToDrop && (project.verdict === "Ignore" || project.status === "Skip") && (
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ color: RED, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Kill Signal</div>
-                  <div style={{ color: "rgba(220,38,38,0.85)", fontSize: 13 }}>{project.reasonToDrop}</div>
-                </div>
-              )}
             </CollapsibleSection>
           )}
 
-          {/* Collapsible: Play Detail */}
+          {/* Play Detail */}
           {hasPlayDetail && (
-            <CollapsibleSection
-              label="Play Detail"
-              open={sectionOpen.playDetail}
-              onToggle={() => setSectionOpen((s) => ({ ...s, playDetail: !s.playDetail }))}
-            >
+            <CollapsibleSection label="Play Detail" open={sectionOpen.playDetail} onToggle={() => setSectionOpen((s) => ({ ...s, playDetail: !s.playDetail }))}>
               {project.playStatus && project.playStatus !== "Belum Ada" && (
                 <div style={{ marginBottom: 8 }}>
                   <div style={{ color: TEXT_MUTED, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Play Status</div>
@@ -418,13 +397,9 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
             </CollapsibleSection>
           )}
 
-          {/* Collapsible: Links & Source */}
+          {/* Links & Source */}
           {hasLinksSource && (
-            <CollapsibleSection
-              label="Links & Source"
-              open={sectionOpen.linksSource}
-              onToggle={() => setSectionOpen((s) => ({ ...s, linksSource: !s.linksSource }))}
-            >
+            <CollapsibleSection label="Links & Source" open={sectionOpen.linksSource} onToggle={() => setSectionOpen((s) => ({ ...s, linksSource: !s.linksSource }))}>
               {project.source && (
                 <div style={{ marginBottom: 8 }}>
                   <div style={{ color: TEXT_MUTED, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Source</div>
@@ -443,7 +418,7 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
             </CollapsibleSection>
           )}
 
-          {/* Always visible: action buttons — Step 3 order: detail, edit, share, hapus */}
+          {/* Action buttons — detail, edit, share, hapus */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 10, paddingBottom: 10, borderTop: `1px solid ${BORDER_SUB}`, marginTop: 4, flexWrap: "wrap" }}>
             <button type="button" onClick={(e) => { e.stopPropagation(); setLocation(`/project/${project.id}`); }} data-testid={`btn-detail-${project.id}`}
               style={{ height: 32, padding: "0 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", background: ACCENT, color: "#fff", border: "none", minWidth: 56 }}>
@@ -495,14 +470,7 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
   const [confirmClear, setConfirmClear] = useState(false);
 
   function handleBackup() {
-    const data = localStorage.getItem(STORAGE_KEY) || "[]";
-    const blob = new Blob([data], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `alphatrack-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    exportBackup(getAllProjects());
     showToast("backup berhasil");
     onClose();
   }
@@ -514,25 +482,23 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        try {
-          const parsed = JSON.parse(evt.target?.result as string);
-          if (!Array.isArray(parsed)) throw new Error("invalid");
-          saveProjects(parsed);
-          showToast(`data diimport · ${parsed.length} project`);
+      importBackup(
+        file,
+        (projects) => {
+          saveAllProjects(projects);
+          showToast(`data diimport · ${projects.length} project`);
           onClose();
           window.location.reload();
-        } catch { alert("File tidak valid."); }
-      };
-      reader.readAsText(file);
+        },
+        (msg) => alert(msg)
+      );
     };
     input.click();
   }
 
   function handleClearAll() {
     if (!confirmClear) { setConfirmClear(true); return; }
-    localStorage.removeItem(STORAGE_KEY);
+    saveAllProjects([]);
     showToast("semua data dihapus");
     onClose();
     window.location.reload();
@@ -550,7 +516,7 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
             <button type="button" onClick={handleClearAll} data-testid="btn-clear" style={{ ...settingBtnStyle, color: RED, fontSize: 12 }}>Hapus Semua Data</button>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <span style={{ color: TEXT_SEC, fontSize: 12 }}>Hapus semua {getProjects().length} project?</span>
+              <span style={{ color: TEXT_SEC, fontSize: 12 }}>Hapus semua {getAllProjects().length} project?</span>
               <div style={{ display: "flex", gap: 8 }}>
                 <button type="button" onClick={() => setConfirmClear(false)} style={settingBtnStyle}>Batal</button>
                 <button type="button" onClick={handleClearAll} data-testid="btn-confirm-clear" style={{ ...settingBtnStyle, background: RED_LIGHT, color: RED, border: `1px solid ${RED_BORD}` }}>Hapus Semua</button>
@@ -620,8 +586,8 @@ export default function Dashboard() {
         p.category.some((c) => c.toLowerCase().includes(q)) ||
         p.source.toLowerCase().includes(q) ||
         (p.verdict ?? "").toLowerCase().includes(q) ||
-        (p.reasonToDrop ?? "").toLowerCase().includes(q) ||
-        (p.timingWindow ?? "").toLowerCase().includes(q)
+        (p.timingWindow ?? "").toLowerCase().includes(q) ||
+        p.ct.names.join(" ").toLowerCase().includes(q)
       );
     }
     return true;
@@ -645,7 +611,7 @@ export default function Dashboard() {
   const filterDropdowns = [
     { value: statusFilter,   onChange: (v: string) => setStatusFilter(v),   testId: "filter-status",   options: [{ value: "All", label: "All Status" },   ...STATUS_ORDER.map((s) => ({ value: s, label: s }))] },
     { value: priorityFilter, onChange: (v: string) => setPriorityFilter(v), testId: "filter-priority", options: [{ value: "All", label: "All Priority" }, { value: "High", label: "High" }, { value: "Medium", label: "Medium" }, { value: "Low", label: "Low" }] },
-    { value: playFilter,     onChange: (v: string) => setPlayFilter(v),     testId: "filter-play",     options: [{ value: "All", label: "All Play" }, { value: "Belum Ada", label: "Belum Ada" }, { value: "Segera", label: "Segera" }, { value: "Aktif", label: "Aktif" }, { value: "Selesai", label: "Selesai" }] },
+    { value: playFilter,     onChange: (v: string) => setPlayFilter(v),     testId: "filter-play",     options: [{ value: "All", label: "All Play" }, { value: "Belum Ada", label: "Belum Ada" }, { value: "Aktif", label: "Aktif" }, { value: "Selesai", label: "Selesai" }, { value: "Skip", label: "Skip" }] },
     { value: timingFilter,   onChange: (v: string) => setTimingFilter(v),   testId: "filter-timing",   options: [{ value: "All", label: "All Timing" }, { value: "Now", label: "Now" }, { value: "This Week", label: "This Week" }, { value: "Monitor", label: "Monitor" }, { value: "No Rush", label: "No Rush" }] },
     { value: chainFilter,    onChange: (v: string) => setChainFilter(v),    testId: "filter-chain",    options: [{ value: "All", label: "All Chain" }, ...allChains.map((c) => ({ value: c, label: c }))] },
   ];
@@ -659,10 +625,9 @@ export default function Dashboard() {
 
   return (
     <div style={{ background: "#FAFAFA", minHeight: "100vh" }}>
-      {/* ── Sticky header — Step 1 compact ───────────────────── */}
+      {/* ── Sticky header ─────────────────────────────────────── */}
       <div style={{ position: "sticky", top: 0, zIndex: 30, background: SURFACE, borderBottom: `1px solid ${BORDER}`, padding: "8px 16px 0", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
 
-        {/* Title row */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           <div>
             <div className="syne" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
@@ -687,29 +652,13 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Status pills — Step 1 compact */}
+        {/* Status pills */}
         <div className="hide-scrollbar" style={{ overflowX: "auto", display: "flex", gap: 6, paddingBottom: 8, paddingTop: 6 }}>
           {statusPills.map((pill) => {
             const isActive = activePill === pill;
             return (
-              <button
-                key={pill}
-                type="button"
-                onClick={() => { setActivePill(pill); setStatusFilter("All"); }}
-                data-testid={`pill-${pill}`}
-                style={{
-                  background: isActive ? ACCENT : SURF_RAISED,
-                  color: isActive ? "#fff" : TEXT_SEC,
-                  border: isActive ? "1px solid transparent" : `1px solid ${BORDER}`,
-                  borderRadius: 999,
-                  padding: "4px 10px",
-                  fontSize: 12,
-                  fontWeight: isActive ? 600 : 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  display: "flex", alignItems: "center", gap: 4,
-                }}
-              >
+              <button key={pill} type="button" onClick={() => { setActivePill(pill); setStatusFilter("All"); }} data-testid={`pill-${pill}`}
+                style={{ background: isActive ? ACCENT : SURF_RAISED, color: isActive ? "#fff" : TEXT_SEC, border: isActive ? "1px solid transparent" : `1px solid ${BORDER}`, borderRadius: 999, padding: "4px 10px", fontSize: 12, fontWeight: isActive ? 600 : 500, cursor: "pointer", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}>
                 {pill}
                 <span style={{ fontSize: 10, opacity: 0.75 }}>{counts[pill] ?? 0}</span>
               </button>
@@ -717,32 +666,19 @@ export default function Dashboard() {
           })}
         </div>
 
-        {/* Filter bar — Step 1 compact */}
+        {/* Filter bar */}
         <div style={{ paddingBottom: 8, display: "flex", flexDirection: "column", gap: 6, marginBottom: 2 }}>
-          {/* Search */}
           <div style={{ position: "relative" }}>
             <Search size={14} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#9CA3AF", pointerEvents: "none" }} />
             <input
-              type="search"
-              placeholder="search name, chain, category, verdict..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
+              type="search" placeholder="search name, chain, category, verdict..."
+              value={search} onChange={(e) => setSearch(e.target.value)}
+              onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)}
               data-testid="input-search"
-              style={{
-                width: "100%", background: SURFACE,
-                border: `1px solid ${searchFocused ? ACCENT : BORDER}`,
-                borderRadius: 8, height: 36,
-                paddingLeft: 32, paddingRight: 12,
-                color: TEXT_PRI, fontSize: 13, fontFamily: "'Inter', sans-serif",
-                outline: "none", boxSizing: "border-box",
-                boxShadow: searchFocused ? `0 0 0 3px ${ACCENT_LIGHT}` : "none",
-              }}
+              style={{ width: "100%", background: SURFACE, border: `1px solid ${searchFocused ? ACCENT : BORDER}`, borderRadius: 8, height: 36, paddingLeft: 32, paddingRight: 12, color: TEXT_PRI, fontSize: 13, fontFamily: "'Inter', sans-serif", outline: "none", boxSizing: "border-box", boxShadow: searchFocused ? `0 0 0 3px ${ACCENT_LIGHT}` : "none" }}
             />
           </div>
 
-          {/* Row 1: Status + Priority */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
             {[filterDropdowns[0], filterDropdowns[1]].map((f) => (
               <div key={f.testId} style={{ position: "relative" }}>
@@ -754,7 +690,6 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {/* Row 2: Play + Chain */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
             {[filterDropdowns[2], filterDropdowns[4]].map((f) => (
               <div key={f.testId} style={{ position: "relative" }}>
@@ -766,7 +701,6 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {/* Row 3: Timing — half width left */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
             <div style={{ position: "relative" }}>
               <select value={filterDropdowns[3].value} onChange={(e) => filterDropdowns[3].onChange(e.target.value)} data-testid={filterDropdowns[3].testId} style={selectStyle}>
