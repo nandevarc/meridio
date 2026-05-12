@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
   Project, STATUS_STYLES, PRIORITY_COLORS, PLAY_STATUS_COLORS,
-  VERDICT_STYLES, TIMING_STYLES, Verdict, computeQuickScore, scoreColor, SCORE_LABELS
+  VERDICT_STYLES, TIMING_STYLES, Verdict, computeQuickScore, SCORE_LABELS
 } from "../types";
 import { getProject, deleteProject, updateProject, formatDate, formatDateTime } from "../utils/storage";
 import { useToast } from "../context/ToastContext";
@@ -30,9 +30,9 @@ interface Props { id: string; }
 function Row({ label, value }: { label: string; value: string | number | null | undefined }) {
   if (!value && value !== 0) return null;
   return (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ color: TEXT_MUTED, fontSize: 11, marginBottom: 3, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</div>
-      <div style={{ color: TEXT_SEC, fontSize: 14, lineHeight: 1.5 }}>{String(value)}</div>
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ color: TEXT_MUTED, fontSize: 10, marginBottom: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</div>
+      <div style={{ color: TEXT_SEC, fontSize: 14, lineHeight: 1.6 }}>{String(value)}</div>
     </div>
   );
 }
@@ -40,9 +40,9 @@ function Row({ label, value }: { label: string; value: string | number | null | 
 function Tags({ tags, style }: { tags: string[]; style?: React.CSSProperties }) {
   if (!tags || tags.length === 0) return null;
   return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
       {tags.map((t) => (
-        <span key={t} style={{ background: SURF_RAISED, color: TEXT_SEC, border: `1px solid ${BORDER}`, borderRadius: 6, padding: "3px 10px", fontSize: 12, fontWeight: 500, ...style }}>{t}</span>
+        <span key={t} style={{ background: SURF_RAISED, color: TEXT_SEC, border: `1px solid ${BORDER}`, borderRadius: 4, padding: "2px 8px", fontSize: 11, fontWeight: 500, ...style }}>{t}</span>
       ))}
     </div>
   );
@@ -53,16 +53,16 @@ function SectionLabel({ title, color }: { title: string; color?: string }) {
     <div style={{
       color: color ?? TEXT_MUTED,
       fontSize: 11, fontWeight: 600,
-      textTransform: "uppercase", letterSpacing: "0.07em",
+      textTransform: "uppercase", letterSpacing: "0.08em",
       borderTop: `1px solid ${BORDER_SUB}`,
-      paddingTop: 16, marginTop: 20, marginBottom: 12,
+      paddingTop: 16, marginTop: 24, marginBottom: 8,
     }}>
       // {title}
     </div>
   );
 }
 
-// ── ScoreBreakdown (upgraded dots) ────────────────────────────────
+// ── ScoreBreakdown ─────────────────────────────────────────────────
 
 interface ScoreBreakdownProps {
   scoreNarrative: number | null;
@@ -79,14 +79,14 @@ function ScoreBreakdown({ scoreNarrative, scoreBuilder, scoreCT, scoreTiming, sc
   if (!hasAny) return null;
 
   return (
-    <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16 }}>
+    <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "12px 16px" }}>
       {SCORE_LABELS.map(({ key, label }) => {
         const val = scores[key as string] as number | null;
         const filled = val ?? 0;
         return (
-          <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <span style={{ color: "#374151", fontSize: 13, flex: 1 }}>{label}</span>
-            <div style={{ display: "flex", gap: 4 }}>
+          <div key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 6, paddingBottom: 6 }}>
+            <span style={{ fontSize: 14, color: TEXT_SEC, flex: 1, minWidth: 0 }}>{label}</span>
+            <div style={{ display: "flex", gap: 6, marginLeft: 12, marginRight: 12 }}>
               {[1, 2, 3, 4, 5].map((n) => (
                 <div
                   key={n}
@@ -99,15 +99,15 @@ function ScoreBreakdown({ scoreNarrative, scoreBuilder, scoreCT, scoreTiming, sc
                 />
               ))}
             </div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRI, width: 16, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: TEXT_PRI, width: 20, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
               {val !== null ? val : "—"}
             </span>
           </div>
         );
       })}
-      <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 12, marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 13, color: TEXT_MUTED }}>Total</span>
-        <span style={{ fontSize: 15, fontWeight: 700, color: ACCENT, fontVariantNumeric: "tabular-nums" }}>
+      <div style={{ borderTop: `2px solid ${BORDER}`, paddingTop: 12, marginTop: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: TEXT_SEC }}>Total</span>
+        <span style={{ fontSize: 18, fontWeight: 700, color: ACCENT, fontVariantNumeric: "tabular-nums" }}>
           {total !== null ? `${total} / 25` : "— / 25"}
         </span>
       </div>
@@ -192,7 +192,6 @@ export default function DetailProject({ id }: Props) {
 
   const verdictOptions: NonNullable<Verdict>[] = ["Strong Play", "Watch", "Ignore"];
 
-  // Compact pill style for header status row
   const pillStyle: React.CSSProperties = {
     background: SURF_RAISED, border: `1px solid ${BORDER}`,
     color: TEXT_SEC, borderRadius: 999,
@@ -200,30 +199,31 @@ export default function DetailProject({ id }: Props) {
   };
 
   return (
-    <div style={{ background: "#FAFAFA", minHeight: "100vh", paddingBottom: 80 }}>
+    <div style={{ background: "#FAFAFA", minHeight: "100vh", paddingBottom: 32 }}>
       {/* Sticky header */}
       <div style={{ position: "sticky", top: 0, zIndex: 30, background: SURFACE, borderBottom: `1px solid ${BORDER}`, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
-        <button type="button" onClick={() => setLocation("/")} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, display: "flex", alignItems: "center", padding: 4 }} data-testid="btn-back">
+        <button type="button" onClick={() => setLocation("/")} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, display: "flex", alignItems: "center", padding: 4, minHeight: 36 }} data-testid="btn-back">
           <ArrowLeft size={18} />
         </button>
         <span className="syne" style={{ fontWeight: 800, fontSize: 18, color: TEXT_PRI, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {project.name}
         </span>
-        <button type="button" onClick={() => setLocation(`/project/${project.id}/edit`)} data-testid="btn-edit" style={{ background: SURF_RAISED, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "7px 14px", color: TEXT_SEC, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontWeight: 500 }}>
+        <button type="button" onClick={() => setLocation(`/project/${project.id}/edit`)} data-testid="btn-edit"
+          style={{ background: SURF_RAISED, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "7px 14px", minHeight: 36, color: TEXT_SEC, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontWeight: 500 }}>
           <Edit size={12} /> edit
         </button>
       </div>
 
       <div style={{ padding: "16px" }}>
 
-        {/* ROW 2: Status group — compact pills */}
+        {/* ROW 2: Status group pills */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
           <span style={{ ...pillStyle, background: statusStyle.bg, color: statusStyle.text, border: `1px solid ${statusStyle.border}` }}>{project.status}</span>
           <span style={{ ...pillStyle, color: priorityColor }}>{project.priority}</span>
           <span style={pillStyle}>{project.conviction}</span>
         </div>
 
-        {/* ROW 3: SCORE HERO — only show when score exists */}
+        {/* ROW 3: Score Hero */}
         {qs !== null && (
           <div style={{ background: ACCENT_LIGHT, border: `1px solid ${ACCENT_BORD}`, borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
@@ -243,7 +243,7 @@ export default function DetailProject({ id }: Props) {
           </div>
         )}
 
-        {/* ROW 4: Quick verdict selector — interactive */}
+        {/* ROW 4: Quick verdict — interactive */}
         <div style={{ marginBottom: 20 }}>
           <div style={{ color: TEXT_MUTED, fontSize: 10, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>Quick Verdict</div>
           <div style={{ display: "flex", gap: 6 }}>
@@ -284,9 +284,9 @@ export default function DetailProject({ id }: Props) {
             <Row label="Narrative" value={project.narrative} />
             <Row label="Builder & Team" value={project.builder} />
             {(project.ctSignal || (project.ctCount != null && project.ctCount > 0)) && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ color: TEXT_MUTED, fontSize: 11, marginBottom: 3, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>CT Signal</div>
-                <div style={{ color: TEXT_SEC, fontSize: 14, lineHeight: 1.5 }}>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ color: TEXT_MUTED, fontSize: 10, marginBottom: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>CT Signal</div>
+                <div style={{ color: TEXT_SEC, fontSize: 14, lineHeight: 1.6 }}>
                   {project.ctSignal}
                   {project.ctCount != null && project.ctCount > 0 && (
                     <span> · <span style={{ color: RED, fontWeight: 600 }}>{project.ctCount}×</span></span>
@@ -296,9 +296,9 @@ export default function DetailProject({ id }: Props) {
             )}
             <Row label="Decision Note" value={project.decisionNote} />
             {project.biaCheck && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ color: TEXT_MUTED, fontSize: 11, marginBottom: 3, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>Bias Check</div>
-                <div style={{ color: TEXT_SEC, fontSize: 14, lineHeight: 1.5 }}>{project.biaCheck}</div>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ color: TEXT_MUTED, fontSize: 10, marginBottom: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>Bias Check</div>
+                <div style={{ color: TEXT_SEC, fontSize: 14, lineHeight: 1.6 }}>{project.biaCheck}</div>
               </div>
             )}
           </>
@@ -323,17 +323,17 @@ export default function DetailProject({ id }: Props) {
           <>
             <SectionLabel title="Play" />
             {project.playStatus !== "Belum Ada" && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ color: TEXT_MUTED, fontSize: 11, marginBottom: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>Play Status</div>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ color: TEXT_MUTED, fontSize: 10, marginBottom: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>Play Status</div>
                 <span style={{ color: PLAY_STATUS_COLORS[project.playStatus], fontSize: 14, fontWeight: 500 }}>{project.playStatus}</span>
               </div>
             )}
             {project.playTypes.length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ color: TEXT_MUTED, fontSize: 11, marginBottom: 6, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>Jenis Play</div>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ color: TEXT_MUTED, fontSize: 10, marginBottom: 6, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>Jenis Play</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {project.playTypes.map((pt) => (
-                    <span key={pt} style={{ background: ACCENT_LIGHT, color: ACCENT, border: `1px solid ${ACCENT_BORD}`, borderRadius: 6, padding: "3px 10px", fontSize: 12, fontWeight: 500 }}>{pt}</span>
+                    <span key={pt} style={{ background: ACCENT_LIGHT, color: ACCENT, border: `1px solid ${ACCENT_BORD}`, borderRadius: 4, padding: "2px 8px", fontSize: 11, fontWeight: 500 }}>{pt}</span>
                   ))}
                 </div>
               </div>
@@ -347,7 +347,7 @@ export default function DetailProject({ id }: Props) {
         {project.reasonToDrop && (
           <>
             <SectionLabel title="Kill Signal" color={RED} />
-            <div style={{ color: "rgba(220,38,38,0.85)", fontSize: 14, lineHeight: 1.5 }}>{project.reasonToDrop}</div>
+            <div style={{ color: "rgba(220,38,38,0.85)", fontSize: 14, lineHeight: 1.6 }}>{project.reasonToDrop}</div>
           </>
         )}
 
@@ -358,7 +358,7 @@ export default function DetailProject({ id }: Props) {
             <div style={{ display: "flex", flexDirection: "column" }}>
               {links.map((l) => (
                 <a key={l.key} href={l.url} target="_blank" rel="noopener noreferrer" data-testid={`link-${l.key}`}
-                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0", borderBottom: `1px solid ${SURF_RAISED}`, textDecoration: "none" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0", borderBottom: `1px solid ${SURF_RAISED}`, textDecoration: "none", minHeight: 40 }}>
                   <span style={{ color: TEXT_MUTED, fontSize: 12, width: 80, flexShrink: 0 }}>{l.label}</span>
                   <span style={{ color: ACCENT, fontSize: 12, textDecoration: "underline", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{l.url}</span>
                   <ExternalLink size={12} style={{ color: "#9CA3AF", flexShrink: 0 }} />
@@ -368,20 +368,21 @@ export default function DetailProject({ id }: Props) {
           </>
         )}
 
-        {/* Timestamps */}
-        <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${BORDER_SUB}` }}>
-          <div style={{ color: TEXT_MUTED, fontSize: 11, marginBottom: 4 }}>Created: {formatDateTime(project.createdAt)}</div>
-          <div style={{ color: TEXT_MUTED, fontSize: 11 }}>Updated: {formatDateTime(project.updatedAt)}</div>
+        {/* Timestamps — single compressed line */}
+        <div style={{ marginTop: 16, paddingTop: 8, borderTop: `1px solid ${SURF_RAISED}` }}>
+          <span style={{ color: "#9CA3AF", fontSize: 12 }}>
+            Created {formatDate(project.createdAt)} · Updated {formatDate(project.updatedAt)}
+          </span>
         </div>
 
-        {/* Bottom actions */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 20, marginBottom: 32 }}>
+        {/* Bottom actions — Step 4 */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16, marginBottom: 32 }}>
           <button type="button" onClick={() => setShowShare(true)} data-testid="btn-generate-share"
-            style={{ width: "100%", height: 44, background: SURF_RAISED, color: TEXT_SEC, border: `1px solid ${BORDER}`, borderRadius: 12, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+            style={{ width: "100%", height: 44, background: ACCENT, color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", boxShadow: "0 2px 8px rgba(75,124,111,0.2)" }}>
             generate share text
           </button>
           <button type="button" onClick={() => setShowDeleteModal(true)} data-testid="btn-hapus-project"
-            style={{ width: "100%", height: 44, background: RED_LIGHT, color: RED, border: `1px solid ${RED_BORD}`, borderRadius: 12, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+            style={{ width: "100%", height: 44, background: SURFACE, color: RED, border: `1px solid ${RED_BORD}`, borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
             hapus project
           </button>
         </div>

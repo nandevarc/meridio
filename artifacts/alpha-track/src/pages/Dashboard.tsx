@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
-  Project, ProjectStatus, Priority, TimingWindow,
+  Project, ProjectStatus, Priority,
   STATUS_ORDER, STATUS_STYLES, PRIORITY_COLORS, PLAY_STATUS_COLORS,
-  VERDICT_STYLES, TIMING_STYLES, scoreColor, computeQuickScore,
+  VERDICT_STYLES, computeQuickScore,
 } from "../types";
 import { getProjects, updateProject, deleteProject, saveProjects } from "../utils/storage";
 import { useToast } from "../context/ToastContext";
 import { STORAGE_KEY } from "../types";
 import { Settings, Plus, ChevronDown, ChevronUp, ExternalLink, Search } from "lucide-react";
 
-// ── Design tokens (updated for contrast) ──────────────────────────
+// ── Design tokens ─────────────────────────────────────────────────
 const ACCENT       = "#4B7C6F";
 const ACCENT_LIGHT = "#EBF4F1";
 const ACCENT_BORD  = "#A7D9CE";
@@ -24,6 +24,22 @@ const TEXT_MUTED   = "#6B7280";
 const RED          = "#DC2626";
 const RED_LIGHT    = "#FEF2F2";
 const RED_BORD     = "#FECACA";
+
+// ── Timing left border colors (Step 2) ───────────────────────────
+const TIMING_LEFT_BORDER: Record<string, string> = {
+  "Now":       "#F87171",
+  "This Week": "#FBBF24",
+  "Monitor":   "#60A5FA",
+  "No Rush":   "#E5E7EB",
+};
+
+// ── Timing badge colors — vivid for fast scanning (Step 2) ───────
+const TIMING_BADGE: Record<string, { bg: string; text: string; border: string }> = {
+  "Now":       { bg: "#FEE2E2", text: "#B91C1C", border: "#FECACA" },
+  "This Week": { bg: "#FEF3C7", text: "#B45309", border: "#FDE68A" },
+  "Monitor":   { bg: "#DBEAFE", text: "#1D4ED8", border: "#BFDBFE" },
+  "No Rush":   { bg: "#F3F4F6", text: "#6B7280", border: "#E5E7EB" },
+};
 
 // ── Utilities ─────────────────────────────────────────────────────
 function cycleStatus(current: ProjectStatus): ProjectStatus {
@@ -68,9 +84,12 @@ function generateShareText(project: Project): string {
   return lines.join("\n");
 }
 
-const clamp2: React.CSSProperties = { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" };
+const clamp3: React.CSSProperties = {
+  display: "-webkit-box", WebkitLineClamp: 3,
+  WebkitBoxOrient: "vertical", overflow: "hidden",
+};
 
-// ── Sub-components ────────────────────────────────────────────────
+// ── CollapsibleSection ────────────────────────────────────────────
 
 interface CollapsibleSectionProps {
   label: string;
@@ -87,23 +106,25 @@ function CollapsibleSection({ label, open, onToggle, children }: CollapsibleSect
         onClick={(e) => { e.stopPropagation(); onToggle(); }}
         style={{
           width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          minHeight: 40,
           background: "none", border: "none", borderTop: `1px solid ${BORDER_SUB}`,
-          padding: "10px 0", cursor: "pointer",
+          padding: "8px 0", cursor: "pointer",
+          transition: "all 150ms ease-in-out",
         }}
       >
         <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: TEXT_MUTED }}>
           {label}
         </span>
         {open
-          ? <ChevronUp size={14} style={{ color: "#9CA3AF", flexShrink: 0 }} />
-          : <ChevronDown size={14} style={{ color: "#9CA3AF", flexShrink: 0 }} />
+          ? <ChevronUp size={13} style={{ color: "#9CA3AF", flexShrink: 0 }} />
+          : <ChevronDown size={13} style={{ color: "#9CA3AF", flexShrink: 0 }} />
         }
       </button>
       <div style={{
-        maxHeight: open ? 600 : 0, overflow: "hidden",
+        maxHeight: open ? 800 : 0, overflow: "hidden",
         transition: "max-height 200ms ease-in-out",
       }}>
-        <div style={{ paddingTop: 8, paddingBottom: 12 }}>
+        <div style={{ paddingTop: 8, paddingBottom: 8 }}>
           {children}
         </div>
       </div>
@@ -111,7 +132,7 @@ function CollapsibleSection({ label, open, onToggle, children }: CollapsibleSect
   );
 }
 
-// ── Card ──────────────────────────────────────────────────────────
+// ── ProjectCard ───────────────────────────────────────────────────
 
 interface CardProps {
   project: Project;
@@ -123,6 +144,8 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [sectionOpen, setSectionOpen] = useState({ analysis: false, playDetail: false, linksSource: false });
+  const [showFullDesc, setShowFullDesc] = useState(false);
+  const [showFullNarr, setShowFullNarr] = useState(false);
   const [, setLocation] = useLocation();
 
   const qs = computeQuickScore(project);
@@ -131,21 +154,17 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
   const isStrongPlay = !isDimmed && project.verdict === "Strong Play";
   const isActiveHigh = !isDimmed && project.status === "Active Play" && project.priority === "High";
 
-  let cardBorder = `1px solid ${BORDER}`;
-  let cardBg     = SURFACE;
+  // Card background — high score gets accent tint
+  let cardBg = SURFACE;
+  let cardBorderColor = BORDER;
   if (!isDimmed) {
-    if (project.timingWindow === "Now") cardBorder = `1px solid rgba(220,38,38,0.35)`;
-    if (isHighScore) { cardBg = ACCENT_LIGHT; cardBorder = `1px solid ${ACCENT_BORD}`; }
+    if (isHighScore) { cardBg = ACCENT_LIGHT; cardBorderColor = ACCENT_BORD; }
   }
 
-  let leftBorder = "";
-  const showPlayAccent  = !isDimmed && (project.playStatus === "Aktif" || project.playStatus === "Segera");
-  const playAccentColor = project.playStatus === "Aktif" ? ACCENT : "#D97706";
-  if (!isDimmed) {
-    if (isStrongPlay) leftBorder = `3px solid ${ACCENT}`;
-    if (isActiveHigh) leftBorder = `3px solid ${RED}`;
-    if (!isStrongPlay && !isActiveHigh && showPlayAccent) leftBorder = `3px solid ${playAccentColor}`;
-  }
+  // Timing left border (Step 2 primary signal)
+  const timingLeftColor = (!isDimmed && project.timingWindow)
+    ? (TIMING_LEFT_BORDER[project.timingWindow] ?? "transparent")
+    : "transparent";
 
   const statusStyle   = STATUS_STYLES[project.status];
   const priorityColor = PRIORITY_COLORS[project.priority];
@@ -167,49 +186,53 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
   const showActionRow = actionText !== "" || playNotesText !== "";
   const actionRowText = actionText || playNotesText;
 
-  const hasCTRow    = !!(project.ctSignal || (project.ctCount != null && project.ctCount > 0));
-  const showPlayBadge = showPlayAccent;
+  // Step 2: CT row shows count only; hidden if count = 0/null
+  const ctCount       = project.ctCount ?? 0;
+  const showCTRow     = ctCount > 0;
+  const showPlayBadge = !isDimmed && (project.playStatus === "Aktif" || project.playStatus === "Segera");
 
-  // Expanded section content flags
-  const hasAnalysis   = !!(project.description || project.narrative || project.builder || hasCTRow || project.decisionNote);
-  const hasPlayDetail = !!(project.playNotes || (project.playStatus && project.playStatus !== "Belum Ada"));
+  // Expanded section flags
+  const hasAnalysis    = !!(project.description || project.narrative || project.builder
+    || project.ctSignal || (project.ctCount != null && project.ctCount > 0)
+    || project.decisionNote);
+  const hasPlayDetail  = !!(project.playNotes || (project.playStatus && project.playStatus !== "Belum Ada"));
   const hasLinksSource = links.length > 0 || !!project.source;
-
-  // Shared action button base
-  const expandedBtnBase: React.CSSProperties = {
-    height: 32, padding: "0 12px", borderRadius: 8, fontSize: 12, fontWeight: 500,
-    cursor: "pointer", fontFamily: "'Inter', sans-serif", border: `1px solid ${BORDER}`,
-  };
 
   return (
     <div
       data-testid={`card-project-${project.id}`}
       style={{
         background: cardBg,
-        border: cardBorder,
-        borderRadius: 12,
-        borderLeft: leftBorder || cardBorder,
+        border: `1px solid ${cardBorderColor}`,
+        borderLeft: `3px solid ${timingLeftColor}`,
+        borderRadius: "0 12px 12px 0",
         overflow: "hidden",
         opacity: isDimmed ? 0.45 : 1,
-        transition: "box-shadow 150ms ease, border-color 150ms ease, opacity 150ms ease",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
-        marginBottom: 2,
+        transition: "opacity 150ms ease",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+        marginBottom: 8,
       }}
     >
-      {/* ── Clickable collapsed area ─────────────────────────── */}
-      <div onClick={() => setExpanded((e) => !e)} style={{ padding: "14px 14px 12px", cursor: "pointer", userSelect: "none" }}>
+      {/* ── Collapsed area ───────────────────────────────────── */}
+      <div onClick={() => setExpanded((e) => !e)} style={{ padding: "12px 12px 10px", cursor: "pointer", userSelect: "none" }}>
 
-        {/* Row 1: priority dot + timing badge + name + verdict badge + chevron + status */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 6 }}>
+        {/* Row 1: priority dot + timing badge + name + verdict + chevron + status */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, gap: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
             <div
               className={isActiveHigh ? "pulse-red" : ""}
-              style={{ width: 10, height: 10, borderRadius: "50%", background: priorityColor, flexShrink: 0 }}
+              style={{ width: 8, height: 8, borderRadius: "50%", background: priorityColor, flexShrink: 0 }}
             />
-            {project.timingWindow && TIMING_STYLES[project.timingWindow] && (
+            {project.timingWindow && TIMING_BADGE[project.timingWindow] && (
               <span
                 className={project.timingWindow === "Now" ? "pulse-red" : ""}
-                style={{ background: TIMING_STYLES[project.timingWindow].bg, color: TIMING_STYLES[project.timingWindow].text, border: `1px solid ${TIMING_STYLES[project.timingWindow].border}`, borderRadius: 999, padding: "2px 7px", fontSize: 10, fontWeight: 600, flexShrink: 0 }}
+                style={{
+                  background: TIMING_BADGE[project.timingWindow].bg,
+                  color: TIMING_BADGE[project.timingWindow].text,
+                  border: `1px solid ${TIMING_BADGE[project.timingWindow].border}`,
+                  borderRadius: 999, padding: "2px 7px",
+                  fontSize: 10, fontWeight: 600, flexShrink: 0,
+                }}
               >
                 {project.timingWindow}
               </span>
@@ -242,56 +265,50 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
 
         {/* Row 2 — tags */}
         {(project.chain.length > 0 || project.category.length > 0 || project.stage.length > 0) && (
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
             {project.chain.map((c) => (
-              <span key={c} style={{ background: SURF_RAISED, color: TEXT_SEC, border: `1px solid ${BORDER_SUB}`, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 500 }}>{c}</span>
+              <span key={c} style={{ background: SURF_RAISED, color: TEXT_SEC, border: `1px solid ${BORDER_SUB}`, borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 500 }}>{c}</span>
             ))}
             {project.category.map((c) => (
-              <span key={c} style={{ background: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 500 }}>{c}</span>
+              <span key={c} style={{ background: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 500 }}>{c}</span>
             ))}
             {project.stage.map((s) => (
-              <span key={s} style={{ background: SURF_RAISED, color: TEXT_SEC, border: `1px solid ${BORDER_SUB}`, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 500 }}>{s}</span>
+              <span key={s} style={{ background: SURF_RAISED, color: TEXT_SEC, border: `1px solid ${BORDER_SUB}`, borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 500 }}>{s}</span>
             ))}
           </div>
         )}
 
-        {/* Row 3 — CT + play badge + score pill */}
-        {(hasCTRow || showPlayBadge || qs !== null) && (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            {hasCTRow && (
-              <span style={{ fontSize: 12, color: TEXT_SEC, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "55%" }}>
-                <span style={{ color: TEXT_MUTED }}>CT </span>
-                {project.ctSignal}
-                {project.ctCount != null && project.ctCount > 0 && (
-                  <span> · <span style={{ color: RED }}>{project.ctCount}×</span></span>
-                )}
-                {!project.ctSignal && project.ctCount != null && project.ctCount > 0 && (
-                  <span style={{ color: RED }}>{project.ctCount}× mentioned</span>
-                )}
+        {/* Row 3 — CT count + play badge + score pill */}
+        {(showCTRow || showPlayBadge || qs !== null) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            {showCTRow && (
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: TEXT_MUTED }}>CT</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: TEXT_SEC }}>{ctCount} signals</span>
               </span>
             )}
             {showPlayBadge && (
-              <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: PLAY_STATUS_COLORS[project.playStatus], display: "inline-block" }} />
                 <span style={{ color: PLAY_STATUS_COLORS[project.playStatus] }}>{project.playStatus}</span>
               </span>
             )}
             {qs !== null && (
-              <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", background: ACCENT_LIGHT, border: `1px solid ${ACCENT_BORD}`, borderRadius: 8, padding: "4px 10px" }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT, fontVariantNumeric: "tabular-nums" }}>{qs} / 25</span>
+              <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", background: ACCENT_LIGHT, border: `1px solid ${ACCENT_BORD}`, borderRadius: 6, padding: "3px 8px" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT, fontVariantNumeric: "tabular-nums" }}>{qs} / 25</span>
               </span>
             )}
           </div>
         )}
       </div>
 
-      {/* ── Action required row — always visible ─────────────── */}
+      {/* ── Action required row ───────────────────────────────── */}
       {showActionRow && (
         <div
           onClick={() => setExpanded((e) => !e)}
-          style={{ background: "#F0F7F5", borderTop: `1px solid ${BORDER_SUB}`, borderLeft: `2px solid ${ACCENT}`, borderRadius: "0 0 0 0", padding: "8px 12px", display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
+          style={{ background: "#F0F7F5", borderTop: `1px solid ${BORDER_SUB}`, borderLeft: `2px solid ${ACCENT}`, padding: "6px 10px", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", marginTop: -1 }}
         >
-          <span style={{ color: ACCENT, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>→</span>
+          <span style={{ color: ACCENT, fontSize: 12, fontWeight: 700, flexShrink: 0 }}>→</span>
           <span style={{ color: TEXT_SEC, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {actionRowText}
           </span>
@@ -305,22 +322,15 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
         maxHeight: expanded ? 1200 : 0,
         overflow: "hidden",
         opacity: expanded ? 1 : 0,
-        transition: "max-height 200ms ease-out, opacity 150ms ease-out",
+        transition: "max-height 220ms ease-out, opacity 150ms ease-out",
       }}>
-        <div style={{ padding: "12px 14px 4px" }}>
-
-          {/* Always visible: score pill */}
-          {qs !== null && (
-            <div style={{ display: "inline-flex", alignItems: "center", background: ACCENT_LIGHT, border: `1px solid ${ACCENT_BORD}`, borderRadius: 8, padding: "4px 12px", marginBottom: 10 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: ACCENT, fontVariantNumeric: "tabular-nums" }}>{qs} / 25</span>
-            </div>
-          )}
+        <div style={{ padding: "10px 12px 4px" }}>
 
           {/* Always visible: play type badges */}
           {project.playTypes.length > 0 && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
               {project.playTypes.map((pt) => (
-                <span key={pt} style={{ background: ACCENT_LIGHT, color: ACCENT, border: `1px solid ${ACCENT_BORD}`, borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 500 }}>{pt}</span>
+                <span key={pt} style={{ background: ACCENT_LIGHT, color: ACCENT, border: `1px solid ${ACCENT_BORD}`, borderRadius: 4, padding: "2px 8px", fontSize: 11, fontWeight: 500 }}>{pt}</span>
               ))}
             </div>
           )}
@@ -335,10 +345,10 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
               {project.description && (
                 <div style={{ marginBottom: 8 }}>
                   <div style={{ color: TEXT_MUTED, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Description</div>
-                  <div style={{ color: TEXT_PRI, fontSize: 13, lineHeight: 1.5, ...clamp2 }}>{project.description}</div>
-                  {project.description.length > 120 && (
-                    <button type="button" onClick={(e) => { e.stopPropagation(); setLocation(`/project/${project.id}`); }} style={{ background: "none", border: "none", color: ACCENT, fontSize: 11, cursor: "pointer", padding: "2px 0" }}>
-                      lihat semua →
+                  <div style={{ color: TEXT_PRI, fontSize: 13, lineHeight: 1.5, ...(showFullDesc ? {} : clamp3) }}>{project.description}</div>
+                  {project.description.length > 180 && (
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setShowFullDesc((v) => !v); }} style={{ background: "none", border: "none", color: ACCENT, fontSize: 11, fontWeight: 500, cursor: "pointer", padding: "2px 0" }}>
+                      {showFullDesc ? "lihat lebih sedikit" : "lihat semua →"}
                     </button>
                   )}
                 </div>
@@ -346,10 +356,10 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
               {project.narrative && (
                 <div style={{ marginBottom: 8 }}>
                   <div style={{ color: TEXT_MUTED, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Narrative</div>
-                  <div style={{ color: TEXT_PRI, fontSize: 13, lineHeight: 1.5, ...clamp2 }}>{project.narrative}</div>
-                  {project.narrative.length > 120 && (
-                    <button type="button" onClick={(e) => { e.stopPropagation(); setLocation(`/project/${project.id}`); }} style={{ background: "none", border: "none", color: ACCENT, fontSize: 11, cursor: "pointer", padding: "2px 0" }}>
-                      lihat semua →
+                  <div style={{ color: TEXT_PRI, fontSize: 13, lineHeight: 1.5, ...(showFullNarr ? {} : clamp3) }}>{project.narrative}</div>
+                  {project.narrative.length > 180 && (
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setShowFullNarr((v) => !v); }} style={{ background: "none", border: "none", color: ACCENT, fontSize: 11, fontWeight: 500, cursor: "pointer", padding: "2px 0" }}>
+                      {showFullNarr ? "lihat lebih sedikit" : "lihat semua →"}
                     </button>
                   )}
                 </div>
@@ -360,7 +370,7 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
                   <div style={{ color: TEXT_PRI, fontSize: 13 }}>{project.builder}</div>
                 </div>
               )}
-              {hasCTRow && (
+              {(project.ctSignal || (project.ctCount != null && project.ctCount > 0)) && (
                 <div style={{ marginBottom: 8 }}>
                   <div style={{ color: TEXT_MUTED, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>CT Signal</div>
                   <div style={{ color: TEXT_PRI, fontSize: 13 }}>
@@ -433,18 +443,36 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
             </CollapsibleSection>
           )}
 
-          {/* Always visible: action buttons */}
-          <div style={{ display: "flex", gap: 8, paddingTop: 12, paddingBottom: 12, borderTop: `1px solid ${BORDER_SUB}`, marginTop: 4, flexWrap: "wrap" }}>
-            <button type="button" onClick={(e) => { e.stopPropagation(); const t = generateShareText(project); navigator.clipboard?.writeText(t).catch(() => {}); alert(t); }} data-testid={`btn-share-${project.id}`} style={{ ...expandedBtnBase, background: SURF_RAISED, color: TEXT_SEC }}>share</button>
-            <button type="button" onClick={(e) => { e.stopPropagation(); setLocation(`/project/${project.id}/edit`); }} data-testid={`btn-edit-${project.id}`} style={{ ...expandedBtnBase, background: SURF_RAISED, color: TEXT_SEC }}>edit</button>
-            <button type="button" onClick={(e) => { e.stopPropagation(); setLocation(`/project/${project.id}`); }} data-testid={`btn-detail-${project.id}`} style={{ ...expandedBtnBase, background: SURF_RAISED, color: TEXT_SEC }}>detail</button>
+          {/* Always visible: action buttons — Step 3 order: detail, edit, share, hapus */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 10, paddingBottom: 10, borderTop: `1px solid ${BORDER_SUB}`, marginTop: 4, flexWrap: "wrap" }}>
+            <button type="button" onClick={(e) => { e.stopPropagation(); setLocation(`/project/${project.id}`); }} data-testid={`btn-detail-${project.id}`}
+              style={{ height: 32, padding: "0 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", background: ACCENT, color: "#fff", border: "none", minWidth: 56 }}>
+              detail
+            </button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); setLocation(`/project/${project.id}/edit`); }} data-testid={`btn-edit-${project.id}`}
+              style={{ height: 32, padding: "0 12px", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", background: SURF_RAISED, color: TEXT_SEC, border: `1px solid ${BORDER}` }}>
+              edit
+            </button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); const t = generateShareText(project); navigator.clipboard?.writeText(t).catch(() => {}); alert(t); }} data-testid={`btn-share-${project.id}`}
+              style={{ height: 32, padding: "0 12px", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", background: SURF_RAISED, color: TEXT_SEC, border: `1px solid ${BORDER}` }}>
+              share
+            </button>
             {!confirmDelete ? (
-              <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }} data-testid={`btn-hapus-${project.id}`} style={{ ...expandedBtnBase, background: RED_LIGHT, color: RED, border: `1px solid ${RED_BORD}` }}>hapus</button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }} data-testid={`btn-hapus-${project.id}`}
+                style={{ height: 32, padding: "0 12px", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", background: RED_LIGHT, color: RED, border: `1px solid ${RED_BORD}`, marginLeft: "auto" }}>
+                hapus
+              </button>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={(e) => e.stopPropagation()}>
-                <span style={{ color: TEXT_SEC, fontSize: 11 }}>Hapus {project.name}?</span>
-                <button type="button" onClick={() => setConfirmDelete(false)} style={{ ...expandedBtnBase, background: SURF_RAISED, color: TEXT_SEC }} data-testid={`btn-batal-${project.id}`}>Batal</button>
-                <button type="button" onClick={() => onDelete(project.id)} data-testid={`btn-confirm-hapus-${project.id}`} style={{ ...expandedBtnBase, background: RED_LIGHT, color: RED, border: `1px solid ${RED_BORD}` }}>Hapus</button>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }} onClick={(e) => e.stopPropagation()}>
+                <span style={{ color: TEXT_SEC, fontSize: 11 }}>Hapus?</span>
+                <button type="button" onClick={() => setConfirmDelete(false)} data-testid={`btn-batal-${project.id}`}
+                  style={{ height: 32, padding: "0 10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: SURF_RAISED, color: TEXT_SEC, border: `1px solid ${BORDER}`, fontWeight: 500 }}>
+                  Batal
+                </button>
+                <button type="button" onClick={() => onDelete(project.id)} data-testid={`btn-confirm-hapus-${project.id}`}
+                  style={{ height: 32, padding: "0 10px", borderRadius: 8, fontSize: 12, cursor: "pointer", background: RED_LIGHT, color: RED, border: `1px solid ${RED_BORD}`, fontWeight: 500 }}>
+                  Hapus
+                </button>
               </div>
             )}
           </div>
@@ -624,42 +652,43 @@ export default function Dashboard() {
 
   const selectStyle: React.CSSProperties = {
     background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 8,
-    height: 36, width: "100%", padding: "0 28px 0 10px",
+    height: 32, width: "100%", padding: "0 24px 0 8px",
     color: TEXT_SEC, fontSize: 12, fontFamily: "'Inter', sans-serif",
     cursor: "pointer", outline: "none", appearance: "none", WebkitAppearance: "none",
-    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
   };
 
   return (
     <div style={{ background: "#FAFAFA", minHeight: "100vh" }}>
-      {/* Sticky Header */}
-      <div style={{ position: "sticky", top: 0, zIndex: 30, background: SURFACE, borderBottom: `1px solid ${BORDER}`, padding: "12px 16px 0", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
+      {/* ── Sticky header — Step 1 compact ───────────────────── */}
+      <div style={{ position: "sticky", top: 0, zIndex: 30, background: SURFACE, borderBottom: `1px solid ${BORDER}`, padding: "8px 16px 0", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
 
         {/* Title row */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 2 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           <div>
-            <div className="syne" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1 }}>
+            <div className="syne" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
               <span style={{ color: TEXT_PRI }}>ALPHA</span>
               <span style={{ color: RED }}>TRACK</span>
             </div>
-            <div style={{ color: TEXT_MUTED, fontSize: 11, marginTop: 3 }}>
+            <div style={{ color: TEXT_MUTED, fontSize: 11, marginTop: 2 }}>
               <span>{projects.length} total · {activeCount} active · {watchCount} watch</span>
               {strongCount > 0 && <span> · <span style={{ color: ACCENT }}>{strongCount}◈</span></span>}
               {ignoreCount > 0 && <span> · <span style={{ color: TEXT_MUTED }}>{ignoreCount}ø</span></span>}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" onClick={() => setShowSettings(true)} data-testid="btn-settings" style={{ width: 36, height: 36, borderRadius: "50%", background: SURF_RAISED, border: `1px solid ${BORDER}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_MUTED }}>
-              <Settings size={16} />
+          <div style={{ display: "flex", gap: 8, paddingTop: 2 }}>
+            <button type="button" onClick={() => setShowSettings(true)} data-testid="btn-settings"
+              style={{ width: 36, height: 36, borderRadius: "50%", background: SURF_RAISED, border: `1px solid ${BORDER}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_MUTED }}>
+              <Settings size={15} />
             </button>
-            <button type="button" onClick={() => setLocation("/add")} data-testid="btn-add" style={{ width: 40, height: 40, borderRadius: "50%", background: ACCENT, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 2px 8px rgba(75,124,111,0.3)" }}>
-              <Plus size={20} />
+            <button type="button" onClick={() => setLocation("/add")} data-testid="btn-add"
+              style={{ width: 36, height: 36, borderRadius: "50%", background: ACCENT, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 2px 6px rgba(75,124,111,0.3)" }}>
+              <Plus size={18} />
             </button>
           </div>
         </div>
 
-        {/* Status pills */}
-        <div className="hide-scrollbar" style={{ overflowX: "auto", display: "flex", gap: 6, paddingBottom: 10, paddingTop: 10 }}>
+        {/* Status pills — Step 1 compact */}
+        <div className="hide-scrollbar" style={{ overflowX: "auto", display: "flex", gap: 6, paddingBottom: 8, paddingTop: 6 }}>
           {statusPills.map((pill) => {
             const isActive = activePill === pill;
             return (
@@ -671,16 +700,14 @@ export default function Dashboard() {
                 style={{
                   background: isActive ? ACCENT : SURF_RAISED,
                   color: isActive ? "#fff" : TEXT_SEC,
-                  border: isActive ? `1px solid transparent` : `1px solid ${BORDER}`,
+                  border: isActive ? "1px solid transparent" : `1px solid ${BORDER}`,
                   borderRadius: 999,
-                  padding: "5px 12px",
+                  padding: "4px 10px",
                   fontSize: 12,
                   fontWeight: isActive ? 600 : 500,
                   cursor: "pointer",
                   whiteSpace: "nowrap",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
+                  display: "flex", alignItems: "center", gap: 4,
                 }}
               >
                 {pill}
@@ -690,11 +717,11 @@ export default function Dashboard() {
           })}
         </div>
 
-        {/* Filter bar */}
-        <div style={{ paddingBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-          {/* Search with icon */}
+        {/* Filter bar — Step 1 compact */}
+        <div style={{ paddingBottom: 8, display: "flex", flexDirection: "column", gap: 6, marginBottom: 2 }}>
+          {/* Search */}
           <div style={{ position: "relative" }}>
-            <Search size={15} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9CA3AF", pointerEvents: "none" }} />
+            <Search size={14} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#9CA3AF", pointerEvents: "none" }} />
             <input
               type="search"
               placeholder="search name, chain, category, verdict..."
@@ -704,8 +731,10 @@ export default function Dashboard() {
               onBlur={() => setSearchFocused(false)}
               data-testid="input-search"
               style={{
-                width: "100%", background: SURFACE, border: `1px solid ${searchFocused ? ACCENT : BORDER}`,
-                borderRadius: 8, height: 40, paddingLeft: 34, paddingRight: 12,
+                width: "100%", background: SURFACE,
+                border: `1px solid ${searchFocused ? ACCENT : BORDER}`,
+                borderRadius: 8, height: 36,
+                paddingLeft: 32, paddingRight: 12,
                 color: TEXT_PRI, fontSize: 13, fontFamily: "'Inter', sans-serif",
                 outline: "none", boxSizing: "border-box",
                 boxShadow: searchFocused ? `0 0 0 3px ${ACCENT_LIGHT}` : "none",
@@ -714,36 +743,36 @@ export default function Dashboard() {
           </div>
 
           {/* Row 1: Status + Priority */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
             {[filterDropdowns[0], filterDropdowns[1]].map((f) => (
               <div key={f.testId} style={{ position: "relative" }}>
                 <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={selectStyle}>
                   {f.options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
-                <ChevronDown size={11} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
+                <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
               </div>
             ))}
           </div>
 
           {/* Row 2: Play + Chain */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
             {[filterDropdowns[2], filterDropdowns[4]].map((f) => (
               <div key={f.testId} style={{ position: "relative" }}>
                 <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={selectStyle}>
                   {f.options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
-                <ChevronDown size={11} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
+                <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
               </div>
             ))}
           </div>
 
-          {/* Row 3: Timing — HALF WIDTH (left column only) */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {/* Row 3: Timing — half width left */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
             <div style={{ position: "relative" }}>
               <select value={filterDropdowns[3].value} onChange={(e) => filterDropdowns[3].onChange(e.target.value)} data-testid={filterDropdowns[3].testId} style={selectStyle}>
                 {filterDropdowns[3].options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
-              <ChevronDown size={11} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
+              <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
             </div>
             <div />
           </div>
@@ -751,16 +780,17 @@ export default function Dashboard() {
       </div>
 
       {/* Card list */}
-      <div style={{ padding: "12px 12px 80px" }}>
+      <div style={{ padding: "10px 10px 24px" }}>
         {filtered.length === 0 ? (
           <div style={{ textAlign: "center", paddingTop: 60 }}>
             <div style={{ color: TEXT_MUTED, fontSize: 13, marginBottom: 16 }}>tidak ada project</div>
-            <button type="button" onClick={() => setLocation("/add")} data-testid="btn-add-empty" style={{ background: ACCENT, color: "#fff", border: "none", borderRadius: 10, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>
+            <button type="button" onClick={() => setLocation("/add")} data-testid="btn-add-empty"
+              style={{ background: ACCENT, color: "#fff", border: "none", borderRadius: 10, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>
               + tambah project
             </button>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {filtered.map((project) => (
               <ProjectCard key={project.id} project={project} onStatusChange={handleStatusChange} onDelete={handleDelete} />
             ))}
