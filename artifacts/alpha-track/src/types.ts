@@ -15,11 +15,11 @@ export const STORAGE_KEY = "alphatrack_v2";
 export const STATUS_ORDER: ProjectStatus[] = ["Screening", "Watchlist", "Active Play", "Done", "Skip"];
 
 export const STATUS_STYLES: Record<ProjectStatus, { text: string; bg: string; border: string }> = {
-  Screening:     { text: "#6B7280", bg: "#F5F5F5",  border: "#E5E7EB" },
-  Watchlist:     { text: "#2563EB", bg: "#EFF6FF",  border: "#BFDBFE" },
-  "Active Play": { text: "#059669", bg: "#ECFDF5",  border: "#A7F3D0" },
-  Skip:          { text: "#DC2626", bg: "#FEF2F2",  border: "#FECACA" },
-  Done:          { text: "#7C3AED", bg: "#F5F3FF",  border: "#DDD6FE" },
+  Screening:     { text: "#475569", bg: "#F1F5F9", border: "#E2E8F0" },
+  Watchlist:     { text: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE" },
+  "Active Play": { text: "#4B7C6F", bg: "#EBF4F1", border: "#A7F3D0" },
+  Done:          { text: "#6B7280", bg: "#F9FAFB", border: "#E5E7EB" },
+  Skip:          { text: "#EF4444", bg: "#FEF2F2", border: "#FECACA" },
 };
 
 export const PRIORITY_COLORS: Record<Priority, string> = {
@@ -41,9 +41,9 @@ export const PLAY_TYPES = [
 ];
 
 export const VERDICT_STYLES: Record<Verdict, { text: string; bg: string; border: string }> = {
-  "Strong Play": { text: "#4B7C6F", bg: "#EBF4F1", border: "#A7D9CE" },
-  Watch:         { text: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
-  Ignore:        { text: "#9CA3AF", bg: "#F9FAFB", border: "#E5E7EB" },
+  "Strong Play": { text: "#4B7C6F", bg: "#EBF4F1", border: "#A7F3D0" },
+  Watch:         { text: "#B45309", bg: "#FFFBEB", border: "#FDE68A" },
+  Ignore:        { text: "#6B7280", bg: "#F9FAFB", border: "#D1D5DB" },
 };
 
 export const TIMING_STYLES: Record<TimingWindow, { text: string; bg: string; border: string }> = {

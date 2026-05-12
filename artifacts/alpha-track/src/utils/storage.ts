@@ -54,3 +54,12 @@ export function formatDateTime(iso: string): string {
   const mins  = String(d.getMinutes()).padStart(2, "0");
   return `${day}/${month}/${year}, ${hours}.${mins}`;
 }
+
+export function formatDateTimeFull(iso: string): string {
+  const d = new Date(iso);
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const day   = String(d.getDate()).padStart(2, "0");
+  const hours = String(d.getHours()).padStart(2, "0");
+  const mins  = String(d.getMinutes()).padStart(2, "0");
+  return `${day} ${months[d.getMonth()]} ${d.getFullYear()}, ${hours}:${mins}`;
+}

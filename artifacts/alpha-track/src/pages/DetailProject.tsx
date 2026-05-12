@@ -5,7 +5,7 @@ import {
   VERDICT_STYLES, TIMING_STYLES, Verdict, computeQuickScore, SCORE_LABELS,
 } from "../types";
 import type { Project, ProjectScores } from "../types/project";
-import { getProject, formatDate, formatDateTime } from "../utils/storage";
+import { getProject, formatDate, formatDateTimeFull } from "../utils/storage";
 import { saveProject, deleteProject as libDeleteProject, markAsReviewed } from "../lib/storage";
 import { useToast } from "../context/ToastContext";
 import { ArrowLeft, Edit, ExternalLink } from "lucide-react";
@@ -28,7 +28,6 @@ const RED_BORD     = "#FECACA";
 interface Props { id: string; }
 
 // ── Helpers ────────────────────────────────────────────────────────
-
 function Row({ label, value }: { label: string; value: string | number | null | undefined }) {
   if (!value && value !== 0) return null;
   return (
@@ -52,32 +51,16 @@ function Tags({ tags, style }: { tags: string[]; style?: React.CSSProperties }) 
 
 function SectionLabel({ title, color }: { title: string; color?: string }) {
   return (
-    <div style={{
-      color: color ?? TEXT_MUTED,
-      fontSize: 11, fontWeight: 600,
-      textTransform: "uppercase", letterSpacing: "0.08em",
-      borderTop: `1px solid ${BORDER_SUB}`,
-      paddingTop: 16, marginTop: 24, marginBottom: 8,
-    }}>
+    <div style={{ color: color ?? TEXT_MUTED, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", borderTop: `1px solid ${BORDER_SUB}`, paddingTop: 16, marginTop: 24, marginBottom: 8 }}>
       // {title}
     </div>
   );
 }
 
-function relativeDate(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (days === 0) return "today";
-  if (days === 1) return "yesterday";
-  return `${days} days ago`;
-}
-
 // ── ScoreBreakdown ─────────────────────────────────────────────────
-
 function ScoreBreakdown({ scores }: { scores: ProjectScores }) {
   const total = computeQuickScore(scores);
   if (total === null) return null;
-
   return (
     <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "12px 16px" }}>
       {SCORE_LABELS.map(({ key, label }) => {
@@ -103,7 +86,6 @@ function ScoreBreakdown({ scores }: { scores: ProjectScores }) {
 }
 
 // ── DetailProject page ─────────────────────────────────────────────
-
 export default function DetailProject({ id }: Props) {
   const [project, setProject] = useState<Project | null>(null);
   const [showShare, setShowShare] = useState(false);
@@ -131,11 +113,7 @@ export default function DetailProject({ id }: Props) {
   function generateShareText(): string {
     const lines: string[] = [];
     lines.push(`◈ ${project!.name.toUpperCase()}`);
-    const meta = [
-      ...(project!.chain.length ? project!.chain : []),
-      ...(project!.category.length ? project!.category : []),
-      ...(project!.stage.length ? project!.stage : []),
-    ].join(" · ");
+    const meta = [...(project!.chain), ...(project!.category), ...(project!.stage)].join(" · ");
     if (meta) lines.push(meta);
     lines.push("");
     const desc = project!.narrative || project!.description;
@@ -186,12 +164,7 @@ export default function DetailProject({ id }: Props) {
   ].filter((l) => l.url);
 
   const verdictOptions: Verdict[] = ["Strong Play", "Watch", "Ignore"];
-
-  const pillStyle: React.CSSProperties = {
-    background: SURF_RAISED, border: `1px solid ${BORDER}`,
-    color: TEXT_SEC, borderRadius: 999,
-    padding: "4px 10px", fontSize: 12, fontWeight: 500,
-  };
+  const pillStyle: React.CSSProperties = { background: SURF_RAISED, border: `1px solid ${BORDER}`, color: TEXT_SEC, borderRadius: 999, padding: "4px 10px", fontSize: 12, fontWeight: 500 };
 
   return (
     <div style={{ background: "#FAFAFA", minHeight: "100vh", paddingBottom: 32 }}>
@@ -200,9 +173,7 @@ export default function DetailProject({ id }: Props) {
         <button type="button" onClick={() => setLocation("/")} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, display: "flex", alignItems: "center", padding: 4, minHeight: 36 }} data-testid="btn-back">
           <ArrowLeft size={18} />
         </button>
-        <span className="syne" style={{ fontWeight: 800, fontSize: 18, color: TEXT_PRI, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {project.name}
-        </span>
+        <span className="syne" style={{ fontWeight: 800, fontSize: 18, color: TEXT_PRI, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{project.name}</span>
         <button type="button" onClick={() => setLocation(`/project/${project.id}/edit`)} data-testid="btn-edit"
           style={{ background: SURF_RAISED, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "7px 14px", minHeight: 36, color: TEXT_SEC, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontWeight: 500 }}>
           <Edit size={12} /> edit
@@ -222,9 +193,7 @@ export default function DetailProject({ id }: Props) {
         {qs !== null && (
           <div style={{ background: ACCENT_LIGHT, border: `1px solid ${ACCENT_BORD}`, borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
-              <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: ACCENT, marginBottom: 6 }}>
-                Conviction Score
-              </div>
+              <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: ACCENT, marginBottom: 6 }}>Conviction Score</div>
               {project.timingWindow && TIMING_STYLES[project.timingWindow] && (
                 <span style={{ background: TIMING_STYLES[project.timingWindow].bg, color: TIMING_STYLES[project.timingWindow].text, border: `1px solid ${TIMING_STYLES[project.timingWindow].border}`, borderRadius: 999, padding: "2px 8px", fontSize: 11, fontWeight: 500 }}>
                   {project.timingWindow}
@@ -284,9 +253,7 @@ export default function DetailProject({ id }: Props) {
                 <div style={{ color: TEXT_MUTED, fontSize: 10, marginBottom: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>CT Signal</div>
                 <div style={{ color: TEXT_SEC, fontSize: 14, lineHeight: 1.6 }}>
                   {project.ct.names.join(", ")}
-                  {project.ct.count > 0 && (
-                    <span> · <span style={{ color: RED, fontWeight: 600 }}>{project.ct.count}×</span></span>
-                  )}
+                  {project.ct.count > 0 && <span> · <span style={{ color: RED, fontWeight: 600 }}>{project.ct.count}×</span></span>}
                 </div>
               </div>
             )}
@@ -350,36 +317,40 @@ export default function DetailProject({ id }: Props) {
           </>
         )}
 
-        {/* Mark as Reviewed — Part 5 */}
-        <div style={{ marginTop: 24 }}>
+        {/* ── Mark as Reviewed — Part 3B ───────────────────────── */}
+        <div style={{ marginTop: 24, marginBottom: 8 }}>
           <button
             type="button"
             onClick={handleMarkReviewed}
             data-testid="btn-mark-reviewed"
             style={{
-              width: "100%", height: 40, background: SURFACE,
-              border: `1px solid ${BORDER}`, borderRadius: 12,
+              width: "100%", height: 44,
+              background: project.lastReviewedAt ? ACCENT_LIGHT : SURFACE,
+              border: project.lastReviewedAt ? "1px solid #6EE7B7" : `1px solid ${BORDER}`,
+              borderRadius: 12,
               color: project.lastReviewedAt ? ACCENT : TEXT_SEC,
-              fontSize: 14, fontWeight: 500, cursor: "pointer",
+              fontSize: 14,
+              fontWeight: project.lastReviewedAt ? 500 : 400,
+              cursor: "pointer",
               fontFamily: "'Inter', sans-serif",
-              transition: "background 150ms ease",
+              transition: "all 200ms ease",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
             }}
           >
-            {project.lastReviewedAt
-              ? `Reviewed · ${relativeDate(project.lastReviewedAt)}`
-              : "Mark as Reviewed"
-            }
+            {project.lastReviewedAt ? "✓  Reviewed" : "Mark as Reviewed"}
           </button>
+          {project.lastReviewedAt && (
+            <div style={{ textAlign: "center", marginTop: 6, fontSize: 12, color: TEXT_MUTED }}>
+              Last reviewed: {formatDateTimeFull(project.lastReviewedAt)}
+            </div>
+          )}
         </div>
 
         {/* Timestamps */}
-        <div style={{ marginTop: 16, paddingTop: 8, borderTop: `1px solid ${SURF_RAISED}` }}>
+        <div style={{ marginTop: 12, paddingTop: 8, borderTop: `1px solid ${SURF_RAISED}` }}>
           <span style={{ color: "#9CA3AF", fontSize: 12 }}>
             Created {formatDate(project.createdAt)} · Updated {formatDate(project.updatedAt)}
           </span>
-          {project.lastReviewedAt && (
-            <span style={{ color: "#9CA3AF", fontSize: 12 }}> · Last reviewed {formatDateTime(project.lastReviewedAt)}</span>
-          )}
         </div>
 
         {/* Bottom actions */}

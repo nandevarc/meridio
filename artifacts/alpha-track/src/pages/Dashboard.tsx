@@ -5,9 +5,11 @@ import {
   STATUS_ORDER, STATUS_STYLES, PRIORITY_COLORS, PLAY_STATUS_COLORS,
   VERDICT_STYLES, computeQuickScore,
 } from "../types";
+import type { PlayStatus } from "../types/project";
 import { getProjects, updateProject, deleteProject } from "../utils/storage";
 import { getAllProjects, saveAllProjects } from "../lib/storage";
 import { exportBackup, importBackup } from "../lib/exportImport";
+import { QuickAddModal } from "../components/QuickAddModal";
 import { useToast } from "../context/ToastContext";
 import { Settings, Plus, ChevronDown, ChevronUp, ExternalLink, Search } from "lucide-react";
 
@@ -25,6 +27,14 @@ const TEXT_MUTED   = "#6B7280";
 const RED          = "#DC2626";
 const RED_LIGHT    = "#FEF2F2";
 const RED_BORD     = "#FECACA";
+
+// ── Play status dot colors (Part 4A) ──────────────────────────────
+const PLAY_STATUS_DOT: Record<PlayStatus, string> = {
+  "Belum Ada": "#D1D5DB",
+  Aktif:       "#4B7C6F",
+  Selesai:     "#6B7280",
+  Skip:        "#EF4444",
+};
 
 // ── Timing left border colors ─────────────────────────────────────
 const TIMING_LEFT_BORDER: Record<string, string> = {
@@ -55,6 +65,15 @@ function sortProjects(projects: Project[]): Project[] {
     if (pDiff !== 0) return pDiff;
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
+}
+
+function reviewedRelDate(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const days  = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days < 1)  return "today";
+  if (days < 7)  return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  return `${weeks}w ago`;
 }
 
 function generateShareText(project: Project): string {
@@ -91,57 +110,33 @@ const clamp3: React.CSSProperties = {
 };
 
 // ── CollapsibleSection ────────────────────────────────────────────
-
 interface CollapsibleSectionProps {
-  label: string;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
+  label: string; open: boolean;
+  onToggle: () => void; children: React.ReactNode;
 }
-
 function CollapsibleSection({ label, open, onToggle, children }: CollapsibleSectionProps) {
   return (
     <div>
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onToggle(); }}
-        style={{
-          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-          minHeight: 40,
-          background: "none", border: "none", borderTop: `1px solid ${BORDER_SUB}`,
-          padding: "8px 0", cursor: "pointer",
-          transition: "all 150ms ease-in-out",
-        }}
-      >
-        <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: TEXT_MUTED }}>
-          {label}
-        </span>
-        {open
-          ? <ChevronUp size={13} style={{ color: "#9CA3AF", flexShrink: 0 }} />
-          : <ChevronDown size={13} style={{ color: "#9CA3AF", flexShrink: 0 }} />
-        }
+      <button type="button" onClick={(e) => { e.stopPropagation(); onToggle(); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 40, background: "none", border: "none", borderTop: `1px solid ${BORDER_SUB}`, padding: "8px 0", cursor: "pointer" }}>
+        <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: TEXT_MUTED }}>{label}</span>
+        {open ? <ChevronUp size={13} style={{ color: "#9CA3AF", flexShrink: 0 }} /> : <ChevronDown size={13} style={{ color: "#9CA3AF", flexShrink: 0 }} />}
       </button>
-      <div style={{
-        maxHeight: open ? 800 : 0, overflow: "hidden",
-        transition: "max-height 200ms ease-in-out",
-      }}>
-        <div style={{ paddingTop: 8, paddingBottom: 8 }}>
-          {children}
-        </div>
+      <div style={{ maxHeight: open ? 800 : 0, overflow: "hidden", transition: "max-height 200ms ease-in-out" }}>
+        <div style={{ paddingTop: 8, paddingBottom: 8 }}>{children}</div>
       </div>
     </div>
   );
 }
 
 // ── ProjectCard ───────────────────────────────────────────────────
-
 interface CardProps {
   project: Project;
   onStatusChange: (id: string, newStatus: ProjectStatus) => void;
   onDelete: (id: string) => void;
+  isNew?: boolean;
 }
 
-function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
+function ProjectCard({ project, onStatusChange, onDelete, isNew }: CardProps) {
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [sectionOpen, setSectionOpen] = useState({ analysis: false, playDetail: false, linksSource: false });
@@ -156,8 +151,8 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
   const isActiveHigh = !isDimmed && project.status === "Active Play" && project.priority === "High";
 
   let cardBg = SURFACE;
-  let cardBorderColor = BORDER;
-  if (!isDimmed && isHighScore) { cardBg = ACCENT_LIGHT; cardBorderColor = ACCENT_BORD; }
+  let cardBorderColor = isNew ? ACCENT : BORDER;
+  if (!isDimmed && isHighScore) { cardBg = ACCENT_LIGHT; cardBorderColor = isNew ? ACCENT : ACCENT_BORD; }
 
   const timingLeftColor = (!isDimmed && project.timingWindow)
     ? (TIMING_LEFT_BORDER[project.timingWindow] ?? "transparent")
@@ -202,8 +197,8 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
         borderRadius: "0 12px 12px 0",
         overflow: "hidden",
         opacity: isDimmed ? 0.45 : 1,
-        transition: "opacity 150ms ease",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+        transition: "opacity 150ms ease, border-color 600ms ease",
+        boxShadow: isNew ? `0 0 0 2px ${ACCENT_LIGHT}` : "0 1px 3px rgba(0,0,0,0.06)",
         marginBottom: 8,
       }}
     >
@@ -220,22 +215,13 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
             {project.timingWindow && TIMING_BADGE[project.timingWindow] && (
               <span
                 className={project.timingWindow === "Now" ? "pulse-red" : ""}
-                style={{
-                  background: TIMING_BADGE[project.timingWindow].bg,
-                  color: TIMING_BADGE[project.timingWindow].text,
-                  border: `1px solid ${TIMING_BADGE[project.timingWindow].border}`,
-                  borderRadius: 999, padding: "2px 7px",
-                  fontSize: 10, fontWeight: 600, flexShrink: 0,
-                }}
+                style={{ background: TIMING_BADGE[project.timingWindow].bg, color: TIMING_BADGE[project.timingWindow].text, border: `1px solid ${TIMING_BADGE[project.timingWindow].border}`, borderRadius: 999, padding: "2px 7px", fontSize: 10, fontWeight: 600, flexShrink: 0 }}
               >
                 {project.timingWindow}
               </span>
             )}
             {isHighScore && <span style={{ color: ACCENT, fontSize: 12, flexShrink: 0 }}>◈</span>}
-            <span
-              className="syne"
-              style={{ color: nameColor, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}
-            >
+            <span className="syne" style={{ color: nameColor, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}>
               {project.name}
             </span>
             {project.verdict && VERDICT_STYLES[project.verdict] && (
@@ -283,7 +269,7 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
             )}
             {showPlayBadge && (
               <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: PLAY_STATUS_COLORS[project.playStatus], display: "inline-block" }} />
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: PLAY_STATUS_DOT[project.playStatus], display: "inline-block", flexShrink: 0 }} />
                 <span style={{ color: PLAY_STATUS_COLORS[project.playStatus] }}>{project.playStatus}</span>
               </span>
             )}
@@ -292,6 +278,15 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
                 <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT, fontVariantNumeric: "tabular-nums" }}>{qs} / 25</span>
               </span>
             )}
+          </div>
+        )}
+
+        {/* Row 4 — reviewed hint (Part 3C) */}
+        {project.lastReviewedAt && (
+          <div style={{ textAlign: "right", marginTop: 4 }}>
+            <span style={{ fontSize: 10, color: "#9CA3AF" }}>
+              Reviewed {reviewedRelDate(project.lastReviewedAt)}
+            </span>
           </div>
         )}
       </div>
@@ -310,14 +305,7 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
       )}
 
       {/* ── Expanded drawer ───────────────────────────────────── */}
-      <div style={{
-        background: "#F9FAFB",
-        borderTop: expanded ? `1px solid ${BORDER_SUB}` : "none",
-        maxHeight: expanded ? 1200 : 0,
-        overflow: "hidden",
-        opacity: expanded ? 1 : 0,
-        transition: "max-height 220ms ease-out, opacity 150ms ease-out",
-      }}>
+      <div style={{ background: "#F9FAFB", borderTop: expanded ? `1px solid ${BORDER_SUB}` : "none", maxHeight: expanded ? 1200 : 0, overflow: "hidden", opacity: expanded ? 1 : 0, transition: "max-height 220ms ease-out, opacity 150ms ease-out" }}>
         <div style={{ padding: "10px 12px 4px" }}>
 
           {project.playType.length > 0 && (
@@ -328,7 +316,6 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
             </div>
           )}
 
-          {/* Analysis */}
           {hasAnalysis && (
             <CollapsibleSection label="Analysis" open={sectionOpen.analysis} onToggle={() => setSectionOpen((s) => ({ ...s, analysis: !s.analysis }))}>
               {project.description && (
@@ -364,9 +351,7 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
                   <div style={{ color: TEXT_MUTED, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>CT Signal</div>
                   <div style={{ color: TEXT_PRI, fontSize: 13 }}>
                     {project.ct.names.join(", ")}
-                    {project.ct.count > 0 && (
-                      <span> · <span style={{ color: RED, fontWeight: 600 }}>{project.ct.count}×</span></span>
-                    )}
+                    {project.ct.count > 0 && <span> · <span style={{ color: RED, fontWeight: 600 }}>{project.ct.count}×</span></span>}
                   </div>
                 </div>
               )}
@@ -379,7 +364,6 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
             </CollapsibleSection>
           )}
 
-          {/* Play Detail */}
           {hasPlayDetail && (
             <CollapsibleSection label="Play Detail" open={sectionOpen.playDetail} onToggle={() => setSectionOpen((s) => ({ ...s, playDetail: !s.playDetail }))}>
               {project.playStatus && project.playStatus !== "Belum Ada" && (
@@ -397,7 +381,6 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
             </CollapsibleSection>
           )}
 
-          {/* Links & Source */}
           {hasLinksSource && (
             <CollapsibleSection label="Links & Source" open={sectionOpen.linksSource} onToggle={() => setSectionOpen((s) => ({ ...s, linksSource: !s.linksSource }))}>
               {project.source && (
@@ -418,7 +401,7 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
             </CollapsibleSection>
           )}
 
-          {/* Action buttons — detail, edit, share, hapus */}
+          {/* Action buttons */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 10, paddingBottom: 10, borderTop: `1px solid ${BORDER_SUB}`, marginTop: 4, flexWrap: "wrap" }}>
             <button type="button" onClick={(e) => { e.stopPropagation(); setLocation(`/project/${project.id}`); }} data-testid={`btn-detail-${project.id}`}
               style={{ height: 32, padding: "0 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", background: ACCENT, color: "#fff", border: "none", minWidth: 56 }}>
@@ -458,7 +441,6 @@ function ProjectCard({ project, onStatusChange, onDelete }: CardProps) {
 }
 
 // ── Settings sheet ────────────────────────────────────────────────
-
 const settingBtnStyle: React.CSSProperties = {
   background: SURF_RAISED, color: TEXT_SEC, border: `1px solid ${BORDER}`,
   borderRadius: 10, padding: "12px 16px", fontSize: 13,
@@ -474,28 +456,16 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
     showToast("backup berhasil");
     onClose();
   }
-
   function handleRestore() {
     const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json";
+    input.type = "file"; input.accept = ".json";
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      importBackup(
-        file,
-        (projects) => {
-          saveAllProjects(projects);
-          showToast(`data diimport · ${projects.length} project`);
-          onClose();
-          window.location.reload();
-        },
-        (msg) => alert(msg)
-      );
+      importBackup(file, (projects) => { saveAllProjects(projects); showToast(`data diimport · ${projects.length} project`); onClose(); window.location.reload(); }, (msg) => alert(msg));
     };
     input.click();
   }
-
   function handleClearAll() {
     if (!confirmClear) { setConfirmClear(true); return; }
     saveAllProjects([]);
@@ -503,7 +473,6 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
     onClose();
     window.location.reload();
   }
-
   return (
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 100 }} />
@@ -530,20 +499,22 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
 }
 
 // ── Dashboard page ────────────────────────────────────────────────
-
 export default function Dashboard() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [search, setSearch] = useState("");
+  const [projects, setProjects]           = useState<Project[]>([]);
+  const [search, setSearch]               = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusFilter, setStatusFilter]   = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
-  const [playFilter, setPlayFilter] = useState("All");
-  const [chainFilter, setChainFilter] = useState("All");
-  const [timingFilter, setTimingFilter] = useState("All");
-  const [activePill, setActivePill] = useState("All");
-  const [showSettings, setShowSettings] = useState(false);
-  const [, setLocation] = useLocation();
-  const { showToast } = useToast();
+  const [playFilter, setPlayFilter]       = useState("All");
+  const [chainFilter, setChainFilter]     = useState("All");
+  const [timingFilter, setTimingFilter]   = useState("All");
+  const [reviewedFilter, setReviewedFilter] = useState("All");  // Part 3A
+  const [activePill, setActivePill]       = useState("All");
+  const [showSettings, setShowSettings]   = useState(false);
+  const [showQuickAdd, setShowQuickAdd]   = useState(false);    // Part 1
+  const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null); // Part 1
+  const [, setLocation]                   = useLocation();
+  const { showToast }                     = useToast();
 
   const load = useCallback(() => { setProjects(getProjects()); }, []);
 
@@ -562,14 +533,40 @@ export default function Dashboard() {
     setProjects((prev) => prev.map((p) => p.id === id ? updated : p));
     showToast(`status → ${newStatus}`);
   }
-
   function handleDelete(id: string) {
     deleteProject(id);
     setProjects((prev) => prev.filter((p) => p.id !== id));
     showToast("project dihapus");
   }
 
+  // Part 1: Quick Add success
+  function handleQuickAddSuccess(newId: string) {
+    load();
+    setRecentlyAddedId(newId);
+    setTimeout(() => setRecentlyAddedId(null), 2000);
+  }
+
   const allChains = Array.from(new Set(projects.flatMap((p) => p.chain))).sort();
+
+  // Part 3A: reviewed filter logic helper
+  function passesReviewedFilter(p: Project): boolean {
+    if (reviewedFilter === "All") return true;
+    const now = Date.now();
+    if (reviewedFilter === "Never Reviewed") return p.lastReviewedAt === null;
+    if (reviewedFilter === "Not reviewed > 7d") {
+      if (!p.lastReviewedAt) return true;
+      return (now - new Date(p.lastReviewedAt).getTime()) > 7 * 24 * 60 * 60 * 1000;
+    }
+    if (reviewedFilter === "Not reviewed > 14d") {
+      if (!p.lastReviewedAt) return true;
+      return (now - new Date(p.lastReviewedAt).getTime()) > 14 * 24 * 60 * 60 * 1000;
+    }
+    if (reviewedFilter === "Recently Reviewed") {
+      if (!p.lastReviewedAt) return false;
+      return (now - new Date(p.lastReviewedAt).getTime()) <= 7 * 24 * 60 * 60 * 1000;
+    }
+    return true;
+  }
 
   const filtered = sortProjects(projects).filter((p) => {
     if (activePill !== "All" && p.status !== activePill) return false;
@@ -578,6 +575,7 @@ export default function Dashboard() {
     if (playFilter !== "All" && p.playStatus !== playFilter) return false;
     if (chainFilter !== "All" && !p.chain.includes(chainFilter)) return false;
     if (timingFilter !== "All" && p.timingWindow !== timingFilter) return false;
+    if (!passesReviewedFilter(p)) return false;
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -605,23 +603,20 @@ export default function Dashboard() {
 
   const activeCount = projects.filter((p) => p.status === "Active Play").length;
   const watchCount  = projects.filter((p) => p.status === "Watchlist").length;
-  const strongCount = projects.filter((p) => p.verdict === "Strong Play").length;
-  const ignoreCount = projects.filter((p) => p.verdict === "Ignore").length;
 
-  const filterDropdowns = [
-    { value: statusFilter,   onChange: (v: string) => setStatusFilter(v),   testId: "filter-status",   options: [{ value: "All", label: "All Status" },   ...STATUS_ORDER.map((s) => ({ value: s, label: s }))] },
-    { value: priorityFilter, onChange: (v: string) => setPriorityFilter(v), testId: "filter-priority", options: [{ value: "All", label: "All Priority" }, { value: "High", label: "High" }, { value: "Medium", label: "Medium" }, { value: "Low", label: "Low" }] },
-    { value: playFilter,     onChange: (v: string) => setPlayFilter(v),     testId: "filter-play",     options: [{ value: "All", label: "All Play" }, { value: "Belum Ada", label: "Belum Ada" }, { value: "Aktif", label: "Aktif" }, { value: "Selesai", label: "Selesai" }, { value: "Skip", label: "Skip" }] },
-    { value: timingFilter,   onChange: (v: string) => setTimingFilter(v),   testId: "filter-timing",   options: [{ value: "All", label: "All Timing" }, { value: "Now", label: "Now" }, { value: "This Week", label: "This Week" }, { value: "Monitor", label: "Monitor" }, { value: "No Rush", label: "No Rush" }] },
-    { value: chainFilter,    onChange: (v: string) => setChainFilter(v),    testId: "filter-chain",    options: [{ value: "All", label: "All Chain" }, ...allChains.map((c) => ({ value: c, label: c }))] },
-  ];
-
-  const selectStyle: React.CSSProperties = {
-    background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 8,
-    height: 32, width: "100%", padding: "0 24px 0 8px",
-    color: TEXT_SEC, fontSize: 12, fontFamily: "'Inter', sans-serif",
-    cursor: "pointer", outline: "none", appearance: "none", WebkitAppearance: "none",
-  };
+  // Active filter style for dropdowns
+  function dropStyle(isActive: boolean): React.CSSProperties {
+    return {
+      background: isActive ? ACCENT_LIGHT : SURFACE,
+      border: `1px solid ${isActive ? ACCENT : BORDER}`,
+      color: isActive ? ACCENT : TEXT_SEC,
+      borderRadius: 8, height: 32, width: "100%",
+      padding: "0 24px 0 8px",
+      fontSize: 12, fontFamily: "'Inter', sans-serif",
+      cursor: "pointer", outline: "none",
+      appearance: "none", WebkitAppearance: "none",
+    };
+  }
 
   return (
     <div style={{ background: "#FAFAFA", minHeight: "100vh" }}>
@@ -634,10 +629,9 @@ export default function Dashboard() {
               <span style={{ color: TEXT_PRI }}>ALPHA</span>
               <span style={{ color: RED }}>TRACK</span>
             </div>
+            {/* Part 0: Stats row — total · active · watch ONLY */}
             <div style={{ color: TEXT_MUTED, fontSize: 11, marginTop: 2 }}>
-              <span>{projects.length} total · {activeCount} active · {watchCount} watch</span>
-              {strongCount > 0 && <span> · <span style={{ color: ACCENT }}>{strongCount}◈</span></span>}
-              {ignoreCount > 0 && <span> · <span style={{ color: TEXT_MUTED }}>{ignoreCount}ø</span></span>}
+              {projects.length} total · {activeCount} active · {watchCount} watch
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, paddingTop: 2 }}>
@@ -645,7 +639,8 @@ export default function Dashboard() {
               style={{ width: 36, height: 36, borderRadius: "50%", background: SURF_RAISED, border: `1px solid ${BORDER}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_MUTED }}>
               <Settings size={15} />
             </button>
-            <button type="button" onClick={() => setLocation("/add")} data-testid="btn-add"
+            {/* Part 1: + opens Quick Add */}
+            <button type="button" onClick={() => setShowQuickAdd(true)} data-testid="btn-add"
               style={{ width: 36, height: 36, borderRadius: "50%", background: ACCENT, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 2px 6px rgba(75,124,111,0.3)" }}>
               <Plus size={18} />
             </button>
@@ -668,47 +663,56 @@ export default function Dashboard() {
 
         {/* Filter bar */}
         <div style={{ paddingBottom: 8, display: "flex", flexDirection: "column", gap: 6, marginBottom: 2 }}>
+          {/* Search */}
           <div style={{ position: "relative" }}>
             <Search size={14} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#9CA3AF", pointerEvents: "none" }} />
-            <input
-              type="search" placeholder="search name, chain, category, verdict..."
-              value={search} onChange={(e) => setSearch(e.target.value)}
-              onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)}
-              data-testid="input-search"
-              style={{ width: "100%", background: SURFACE, border: `1px solid ${searchFocused ? ACCENT : BORDER}`, borderRadius: 8, height: 36, paddingLeft: 32, paddingRight: 12, color: TEXT_PRI, fontSize: 13, fontFamily: "'Inter', sans-serif", outline: "none", boxSizing: "border-box", boxShadow: searchFocused ? `0 0 0 3px ${ACCENT_LIGHT}` : "none" }}
-            />
+            <input type="search" placeholder="search name, chain, category, verdict..." value={search} onChange={(e) => setSearch(e.target.value)} onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)} data-testid="input-search"
+              style={{ width: "100%", background: SURFACE, border: `1px solid ${searchFocused ? ACCENT : BORDER}`, borderRadius: 8, height: 36, paddingLeft: 32, paddingRight: 12, color: TEXT_PRI, fontSize: 13, fontFamily: "'Inter', sans-serif", outline: "none", boxSizing: "border-box", boxShadow: searchFocused ? `0 0 0 3px ${ACCENT_LIGHT}` : "none" }} />
           </div>
 
+          {/* Row 1: Status + Priority */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-            {[filterDropdowns[0], filterDropdowns[1]].map((f) => (
+            {[
+              { value: statusFilter,   onChange: setStatusFilter,   testId: "filter-status",   opts: [["All","All Status"], ...STATUS_ORDER.map(s => [s,s])] },
+              { value: priorityFilter, onChange: setPriorityFilter, testId: "filter-priority", opts: [["All","All Priority"],["High","High"],["Medium","Medium"],["Low","Low"]] },
+            ].map((f) => (
               <div key={f.testId} style={{ position: "relative" }}>
-                <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={selectStyle}>
-                  {f.options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={dropStyle(f.value !== "All")}>
+                  {f.opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
                 <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
               </div>
             ))}
           </div>
 
+          {/* Row 2: Play + Chain */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-            {[filterDropdowns[2], filterDropdowns[4]].map((f) => (
+            {[
+              { value: playFilter,  onChange: setPlayFilter,  testId: "filter-play",  opts: [["All","All Play"],["Belum Ada","Belum Ada"],["Aktif","Aktif"],["Selesai","Selesai"],["Skip","Skip"]] },
+              { value: chainFilter, onChange: setChainFilter, testId: "filter-chain", opts: [["All","All Chain"], ...allChains.map(c => [c,c])] },
+            ].map((f) => (
               <div key={f.testId} style={{ position: "relative" }}>
-                <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={selectStyle}>
-                  {f.options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={dropStyle(f.value !== "All")}>
+                  {f.opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
                 <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
               </div>
             ))}
           </div>
 
+          {/* Row 3: Timing + Reviewed (Part 3A) */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-            <div style={{ position: "relative" }}>
-              <select value={filterDropdowns[3].value} onChange={(e) => filterDropdowns[3].onChange(e.target.value)} data-testid={filterDropdowns[3].testId} style={selectStyle}>
-                {filterDropdowns[3].options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-              </select>
-              <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
-            </div>
-            <div />
+            {[
+              { value: timingFilter,   onChange: setTimingFilter,   testId: "filter-timing",   opts: [["All","All Timing"],["Now","Now"],["This Week","This Week"],["Monitor","Monitor"],["No Rush","No Rush"]] },
+              { value: reviewedFilter, onChange: setReviewedFilter, testId: "filter-reviewed", opts: [["All","All Reviewed"],["Never Reviewed","Never Reviewed"],["Not reviewed > 7d","Not reviewed > 7d"],["Not reviewed > 14d","Not reviewed > 14d"],["Recently Reviewed","Recently Reviewed"]] },
+            ].map((f) => (
+              <div key={f.testId} style={{ position: "relative" }}>
+                <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={dropStyle(f.value !== "All")}>
+                  {f.opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+                <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -718,7 +722,7 @@ export default function Dashboard() {
         {filtered.length === 0 ? (
           <div style={{ textAlign: "center", paddingTop: 60 }}>
             <div style={{ color: TEXT_MUTED, fontSize: 13, marginBottom: 16 }}>tidak ada project</div>
-            <button type="button" onClick={() => setLocation("/add")} data-testid="btn-add-empty"
+            <button type="button" onClick={() => setShowQuickAdd(true)} data-testid="btn-add-empty"
               style={{ background: ACCENT, color: "#fff", border: "none", borderRadius: 10, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>
               + tambah project
             </button>
@@ -726,13 +730,27 @@ export default function Dashboard() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {filtered.map((project) => (
-              <ProjectCard key={project.id} project={project} onStatusChange={handleStatusChange} onDelete={handleDelete} />
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onStatusChange={handleStatusChange}
+                onDelete={handleDelete}
+                isNew={project.id === recentlyAddedId}
+              />
             ))}
           </div>
         )}
       </div>
 
       {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} />}
+
+      {/* Part 1: Quick Add Modal */}
+      {showQuickAdd && (
+        <QuickAddModal
+          onClose={() => setShowQuickAdd(false)}
+          onSuccess={handleQuickAddSuccess}
+        />
+      )}
     </div>
   );
 }

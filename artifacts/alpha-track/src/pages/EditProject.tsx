@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   ProjectStatus, Priority, PlayStatus, Conviction,
   PLAY_TYPES,
 } from "../types";
 import type { Project, ProjectLinks, ProjectCT, ProjectScores } from "../types/project";
-import { getProject, formatDateTime } from "../utils/storage";
+import { getProject, formatDateTimeFull } from "../utils/storage";
 import { saveProject } from "../lib/storage";
 import { useToast } from "../context/ToastContext";
 import { TagInput, MultiSelectTags } from "../components/TagInput";
@@ -14,19 +14,24 @@ import { ScoreInput } from "../components/ScoreInput";
 import { VerdictPicker, TimingPicker } from "./AddProject";
 import { ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
 
-const ACCENT     = "#4B7C6F";
-const BORDER     = "#E5E7EB";
-const SURFACE    = "#FFFFFF";
+const ACCENT      = "#4B7C6F";
+const BORDER      = "#E5E7EB";
+const SURFACE     = "#FFFFFF";
 const SURF_RAISED = "#F5F5F5";
-const TEXT_PRI   = "#0A0A0A";
-const TEXT_MUTED = "#9CA3AF";
+const TEXT_PRI    = "#0A0A0A";
+const TEXT_MUTED  = "#9CA3AF";
+const RED         = "#DC2626";
+const RED_LIGHT   = "#FEF2F2";
+const RED_BORD    = "#FECACA";
+const TEXT_SEC    = "#4B5563";
+
+type SaveState = "idle" | "saving" | "saved";
 
 interface SectionProps {
   title: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
 }
-
 function Section({ title, children, defaultOpen = true }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -46,12 +51,19 @@ interface Props { id: string; }
 export default function EditProject({ id }: Props) {
   const [, setLocation] = useLocation();
   const { showToast } = useToast();
-  const [form, setForm] = useState<Project | null>(null);
+  const [form, setForm]           = useState<Project | null>(null);
+  const [initialForm, setInitialForm] = useState<Project | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [showDiscard, setShowDiscard] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const p = getProject(id);
-    if (p) setForm(p);
+    if (p) { setForm(p); setInitialForm(p); }
   }, [id]);
+
+  // Clean up timers on unmount
+  useEffect(() => () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); }, []);
 
   if (!form) {
     return (
@@ -60,6 +72,8 @@ export default function EditProject({ id }: Props) {
       </div>
     );
   }
+
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
 
   function set<K extends keyof Project>(key: K, value: Project[K]) {
     setForm((prev) => prev ? { ...prev, [key]: value } : prev);
@@ -77,10 +91,32 @@ export default function EditProject({ id }: Props) {
   function handleSave() {
     if (!form) return;
     if (!form.name.trim()) { alert("Nama project wajib diisi."); return; }
-    saveProject({ ...form, name: form.name.trim() });
-    showToast("project disimpan");
-    setLocation(`/project/${id}`);
+
+    setSaveState("saving");
+    const saved = { ...form, name: form.name.trim() };
+    saveProject(saved);
+    setInitialForm(saved);
+    setForm(saved);
+
+    // Part 5C: save state machine — do NOT navigate
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      setSaveState("saved");
+      showToast("project disimpan");
+      saveTimerRef.current = setTimeout(() => setSaveState("idle"), 1200);
+    }, 800);
   }
+
+  function handleBatal() {
+    if (isDirty) {
+      setShowDiscard(true);
+    } else {
+      setLocation(`/project/${id}`);
+    }
+  }
+
+  const saveLabel = saveState === "saving" ? "Saving..." : saveState === "saved" ? "Saved ✓" : "Simpan";
+  const saveBg    = saveState === "saved" ? "#059669" : ACCENT;
 
   const dateInputStyle: React.CSSProperties = {
     background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 8,
@@ -90,10 +126,10 @@ export default function EditProject({ id }: Props) {
   };
 
   return (
-    <div style={{ background: "#FAFAFA", minHeight: "100vh", paddingBottom: 120 }}>
+    <div style={{ background: "#FAFAFA", minHeight: "100vh", paddingBottom: 160 }}>
       {/* Header */}
       <div style={{ position: "sticky", top: 0, zIndex: 30, background: SURFACE, borderBottom: `1px solid ${BORDER}`, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
-        <button type="button" onClick={() => setLocation(`/project/${id}`)} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, display: "flex", alignItems: "center", padding: 4 }} data-testid="btn-back">
+        <button type="button" onClick={handleBatal} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, display: "flex", alignItems: "center", padding: 4 }} data-testid="btn-back">
           <ArrowLeft size={18} />
         </button>
         <span className="syne" style={{ fontWeight: 800, fontSize: 16, color: TEXT_PRI }}>Edit Project</span>
@@ -170,17 +206,66 @@ export default function EditProject({ id }: Props) {
             <TimingPicker value={form.timingWindow} onChange={(v) => set("timingWindow", v)} />
           </Field>
         </Section>
-
-        <div style={{ color: TEXT_MUTED, fontSize: 11, marginTop: 16, textAlign: "center" }}>
-          Last Updated: {formatDateTime(form.updatedAt)}
-        </div>
       </div>
 
-      {/* Sticky bottom bar */}
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: SURFACE, borderTop: `1px solid ${BORDER}`, padding: 16, zIndex: 30, maxWidth: 480, margin: "0 auto", boxSizing: "border-box", width: "100%", boxShadow: "0 -2px 8px rgba(0,0,0,0.06)" }}>
-        <button type="button" onClick={handleSave} data-testid="btn-simpan" style={{ width: "100%", height: 48, background: ACCENT, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontFamily: "'Inter', sans-serif", fontWeight: 600, cursor: "pointer", boxShadow: "0 2px 8px rgba(75,124,111,0.25)" }}>Simpan</button>
+      {/* ── Sticky bottom bar — Part 5B/5C/5D ──────────────────── */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: SURFACE, borderTop: `1px solid ${BORDER}`, padding: "12px 16px 24px", zIndex: 30, maxWidth: 480, margin: "0 auto", boxSizing: "border-box", width: "100%", boxShadow: "0 -2px 8px rgba(0,0,0,0.06)" }}>
+
+        {/* Part 5B: Last updated — above Simpan */}
+        <div style={{ color: TEXT_MUTED, fontSize: 12, textAlign: "center", marginBottom: 10 }}>
+          Last updated: {formatDateTimeFull(form.updatedAt)}
+        </div>
+
+        {/* Part 5C: Save button with state feedback */}
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saveState !== "idle"}
+          data-testid="btn-simpan"
+          style={{
+            width: "100%", height: 48,
+            background: saveBg,
+            color: "#fff", border: "none", borderRadius: 10,
+            fontSize: 14, fontFamily: "'Inter', sans-serif", fontWeight: 600,
+            cursor: saveState !== "idle" ? "default" : "pointer",
+            opacity: saveState === "saving" ? 0.75 : 1,
+            transition: "background 300ms ease, opacity 200ms ease",
+            boxShadow: "0 2px 8px rgba(75,124,111,0.25)",
+          }}
+        >
+          {saveLabel}
+        </button>
+
+        {/* Part 5D: Batal / discard confirmation */}
         <div style={{ textAlign: "center", marginTop: 10 }}>
-          <button type="button" onClick={() => setLocation(`/project/${id}`)} data-testid="btn-batal" style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, fontSize: 13 }}>Batal</button>
+          {showDiscard ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, fontSize: 12, color: TEXT_MUTED }}>
+              <span>Discard changes?</span>
+              <button
+                type="button"
+                onClick={() => setLocation(`/project/${id}`)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: RED, fontSize: 12, fontWeight: 500, padding: 0 }}
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDiscard(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: ACCENT, fontSize: 12, fontWeight: 500, padding: 0 }}
+              >
+                Keep editing
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleBatal}
+              data-testid="btn-batal"
+              style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, fontSize: 13 }}
+            >
+              Batal
+            </button>
+          )}
         </div>
       </div>
     </div>
