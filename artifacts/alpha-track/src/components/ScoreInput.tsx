@@ -1,12 +1,14 @@
 import { SCORE_LABELS, Project, computeQuickScore } from "../types";
 
-const ACCENT = "#4B7C6F";
-const ACCENT_LIGHT = "#EBF4F1";
-const BORDER = "#E5E7EB";
-const SURFACE = "#FFFFFF";
-const SURFACE_RAISED = "#F5F5F5";
-const TEXT_SECONDARY = "#6B7280";
-const TEXT_MUTED = "#9CA3AF";
+const ACCENT         = "#4B7C6F";
+const ACCENT_LIGHT   = "#EBF4F1";
+const BORDER         = "#D1D5DB";
+const BORDER_SUB     = "#E5E7EB";
+const SURFACE        = "#FFFFFF";
+const SURFACE_RAISED = "#F3F4F6";
+const TEXT_PRIMARY   = "#111827";
+const TEXT_SECONDARY = "#4B5563";
+const TEXT_MUTED     = "#6B7280";
 
 interface ScoreInputProps {
   scoreNarrative: number | null;
@@ -32,7 +34,7 @@ export function ScoreInput({ scoreNarrative, scoreBuilder, scoreCT, scoreTiming,
         return (
           <div key={key}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ color: TEXT_SECONDARY, fontSize: 13, fontFamily: "'Inter', sans-serif" }}>{label}</span>
+              <span style={{ color: TEXT_SECONDARY, fontSize: 13 }}>{label}</span>
               <div style={{ display: "flex", gap: 4 }}>
                 {[0, 1, 2, 3, 4, 5].map((n) => (
                   <button
@@ -46,7 +48,6 @@ export function ScoreInput({ scoreNarrative, scoreBuilder, scoreCT, scoreTiming,
                       background: current === n ? ACCENT : SURFACE_RAISED,
                       color: current === n ? "#FFFFFF" : TEXT_MUTED,
                       fontSize: 12, cursor: "pointer",
-                      fontFamily: "'Inter', sans-serif",
                       fontWeight: current === n ? 600 : 400,
                       transition: "all 150ms ease",
                     }}
@@ -62,15 +63,18 @@ export function ScoreInput({ scoreNarrative, scoreBuilder, scoreCT, scoreTiming,
           </div>
         );
       })}
-      <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 10, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
+      <div style={{ borderTop: `1px solid ${BORDER_SUB}`, paddingTop: 10, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
         <span style={{ color: TEXT_MUTED, fontSize: 12 }}>Total</span>
-        <span style={{ color: ACCENT, fontSize: 15, fontWeight: 700, fontFamily: "'Inter', sans-serif" }}>
+        <span style={{ color: ACCENT, fontSize: 15, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
           {total !== null ? `${total} / ${maxTotal > 0 ? maxTotal : 25}` : "— / 25"}
         </span>
       </div>
     </div>
   );
 }
+
+// ── ScoreDisplay — for forms; kept for backward compat ─────────────
+// (DetailProject now uses its own inline ScoreBreakdown with real dots)
 
 interface ScoreDisplayProps {
   scoreNarrative: number | null;
@@ -86,32 +90,36 @@ export function ScoreDisplay({ scoreNarrative, scoreBuilder, scoreCT, scoreTimin
   const hasAny = SCORE_LABELS.some(({ key }) => scores[key as string] !== null);
   if (!hasAny) return null;
 
-  function dots(val: number | null): string {
-    if (val === null) return "○○○○○";
-    return "●".repeat(val) + "○".repeat(5 - val);
-  }
-
   return (
-    <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 10, padding: 14 }}>
+    <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16 }}>
       {SCORE_LABELS.map(({ key, label }) => {
         const val = scores[key as string] as number | null;
+        const filled = val ?? 0;
         return (
-          <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <span style={{ color: TEXT_MUTED, fontSize: 12, minWidth: 110, flexShrink: 0 }}>{label}</span>
-            <span style={{ fontSize: 13, letterSpacing: 2 }}>
-              {dots(val).split("").map((c, i) => (
-                <span key={i} style={{ color: c === "●" ? ACCENT : "#E5E7EB" }}>{c}</span>
+          <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <span style={{ color: "#374151", fontSize: 13, flex: 1 }}>{label}</span>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <div
+                  key={n}
+                  style={{
+                    width: 12, height: 12, borderRadius: "50%",
+                    background: n <= filled ? ACCENT : BORDER_SUB,
+                    border: n <= filled ? "none" : `1px solid ${BORDER}`,
+                    flexShrink: 0,
+                  }}
+                />
               ))}
-            </span>
-            <span style={{ color: TEXT_SECONDARY, fontSize: 13, marginLeft: "auto", fontWeight: 500 }}>
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, width: 16, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
               {val !== null ? val : "—"}
             </span>
           </div>
         );
       })}
-      <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 4, paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ color: TEXT_MUTED, fontSize: 12, fontWeight: 500 }}>Total</span>
-        <span style={{ color: ACCENT, fontSize: 15, fontWeight: 700 }}>
+      <div style={{ borderTop: `1px solid ${BORDER_SUB}`, paddingTop: 12, marginTop: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ color: TEXT_MUTED, fontSize: 13 }}>Total</span>
+        <span style={{ color: ACCENT, fontSize: 15, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
           {total !== null ? `${total} / 25` : "— / 25"}
         </span>
       </div>

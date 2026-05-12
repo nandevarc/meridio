@@ -36,12 +36,12 @@
 :root {
   --background: #FAFAFA;
   --surface: #FFFFFF;
-  --surface-raised: #F5F5F5;
-  --border: #E5E7EB;
-  --border-subtle: #F0F0F0;
-  --text-primary: #0A0A0A;
-  --text-secondary: #6B7280;
-  --text-muted: #9CA3AF;
+  --surface-raised: #F3F4F6;
+  --border: #D1D5DB;
+  --border-subtle: #E5E7EB;
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #6B7280;
   --accent: #4B7C6F;
   --accent-light: #EBF4F1;
   --accent-foreground: #FFFFFF;
