@@ -9,7 +9,6 @@ import type { PlayStatus } from "../types/project";
 import { getProjects, updateProject, deleteProject } from "../utils/storage";
 import { getAllProjects, saveAllProjects } from "../lib/storage";
 import { exportBackup, importBackup } from "../lib/exportImport";
-import { QuickAddModal } from "../components/QuickAddModal";
 import { useToast } from "../context/ToastContext";
 import { Settings, Plus, ChevronDown, ChevronUp, ExternalLink, Search } from "lucide-react";
 
@@ -540,12 +539,7 @@ export default function Dashboard() {
   }
 
   // Part 1: Quick Add success
-  function handleQuickAddSuccess(newId: string) {
-    load();
-    setRecentlyAddedId(newId);
-    setTimeout(() => setRecentlyAddedId(null), 2000);
-  }
-
+  
   const allChains = Array.from(new Set(projects.flatMap((p) => p.chain))).sort();
 
   // Part 3A: reviewed filter logic helper
@@ -638,12 +632,7 @@ export default function Dashboard() {
             <button type="button" onClick={() => setShowSettings(true)} data-testid="btn-settings"
               style={{ width: 36, height: 36, borderRadius: "50%", background: SURF_RAISED, border: `1px solid ${BORDER}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_MUTED }}>
               <Settings size={15} />
-            </button>
-            {/* Part 1: + opens Quick Add */}
-            <button type="button" onClick={() => setShowQuickAdd(true)} data-testid="btn-add"
-              style={{ width: 36, height: 36, borderRadius: "50%", background: ACCENT, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 2px 6px rgba(75,124,111,0.3)" }}>
-              <Plus size={18} />
-            </button>
+            </butto>
           </div>
         </div>
 
@@ -722,10 +711,8 @@ export default function Dashboard() {
         {filtered.length === 0 ? (
           <div style={{ textAlign: "center", paddingTop: 60 }}>
             <div style={{ color: TEXT_MUTED, fontSize: 13, marginBottom: 16 }}>tidak ada project</div>
-            <button type="button" onClick={() => setShowQuickAdd(true)} data-testid="btn-add-empty"
-              style={{ background: ACCENT, color: "#fff", border: "none", borderRadius: 10, padding: "10px 24px", fontSize: 13, cursor: "pointer" }}>
-              + tambah project
-            </button>
+
+                                                                                                  
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
@@ -735,7 +722,7 @@ export default function Dashboard() {
                 project={project}
                 onStatusChange={handleStatusChange}
                 onDelete={handleDelete}
-                isNew={project.id === recentlyAddedId}
+                isNew={false}
               />
             ))}
           </div>
@@ -744,13 +731,6 @@ export default function Dashboard() {
 
       {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} />}
 
-      {/* Part 1: Quick Add Modal */}
-      {showQuickAdd && (
-        <QuickAddModal
-          onClose={() => setShowQuickAdd(false)}
-          onSuccess={handleQuickAddSuccess}
-        />
-      )}
     </div>
   );
 }
