@@ -101,8 +101,7 @@ const dateInputStyle: React.CSSProperties = {
 export default function AddProject() {
   const [, setLocation] = useLocation();
   const { showToast } = useToast();
-  const isFull = typeof window !== "undefined" && window.location.search.includes("full=true");
-  const [mode, setMode] = useState<"quick" | "full">(isFull ? "full" : "quick");
+  const [mode] = useState<"quick" | "full">("full");
 
   // Pre-fill name from ?name= query param (e.g. from Quick Add "Open Full Form")
   const prefillName = typeof window !== "undefined"
@@ -146,10 +145,6 @@ export default function AddProject() {
           <ArrowLeft size={18} />
         </button>
         <span className="syne" style={{ fontWeight: 800, fontSize: 16, color: TEXT_PRI }}>Tambah Project</span>
-        <div style={{ marginLeft: "auto", display: "flex", border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
-          <button type="button" onClick={() => setMode("quick")} data-testid="btn-mode-quick" style={{ background: mode === "quick" ? ACCENT : SURF_RAISED, color: mode === "quick" ? "#fff" : TEXT_MUTED, border: "none", padding: "6px 14px", fontSize: 12, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: mode === "quick" ? 600 : 400 }}>Mode Cepat</button>
-          <button type="button" onClick={() => setMode("full")} data-testid="btn-mode-full" style={{ background: mode === "full" ? ACCENT : SURF_RAISED, color: mode === "full" ? "#fff" : TEXT_MUTED, border: "none", padding: "6px 14px", fontSize: 12, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: mode === "full" ? 600 : 400 }}>Form Lengkap</button>
-        </div>
       </div>
 
       <div style={{ padding: "16px 16px 0" }}>

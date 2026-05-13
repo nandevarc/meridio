@@ -219,7 +219,6 @@ function ProjectCard({ project, onStatusChange, onDelete, isNew }: CardProps) {
                 {project.timingWindow}
               </span>
             )}
-            {isHighScore && <span style={{ color: ACCENT, fontSize: 12, flexShrink: 0 }}>◈</span>}
             <span className="syne" style={{ color: nameColor, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}>
               {project.name}
             </span>
@@ -507,11 +506,8 @@ export default function Dashboard() {
   const [playFilter, setPlayFilter]       = useState("All");
   const [chainFilter, setChainFilter]     = useState("All");
   const [timingFilter, setTimingFilter]   = useState("All");
-  const [reviewedFilter, setReviewedFilter] = useState("All");  // Part 3A
   const [activePill, setActivePill]       = useState("All");
   const [showSettings, setShowSettings]   = useState(false);
-  const [showQuickAdd, setShowQuickAdd]   = useState(false);    // Part 1
-  const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null); // Part 1
   const [, setLocation]                   = useLocation();
   const { showToast }                     = useToast();
 
@@ -538,29 +534,7 @@ export default function Dashboard() {
     showToast("project dihapus");
   }
 
-  // Part 1: Quick Add success
-  
   const allChains = Array.from(new Set(projects.flatMap((p) => p.chain))).sort();
-
-  // Part 3A: reviewed filter logic helper
-  function passesReviewedFilter(p: Project): boolean {
-    if (reviewedFilter === "All") return true;
-    const now = Date.now();
-    if (reviewedFilter === "Never Reviewed") return p.lastReviewedAt === null;
-    if (reviewedFilter === "Not reviewed > 7d") {
-      if (!p.lastReviewedAt) return true;
-      return (now - new Date(p.lastReviewedAt).getTime()) > 7 * 24 * 60 * 60 * 1000;
-    }
-    if (reviewedFilter === "Not reviewed > 14d") {
-      if (!p.lastReviewedAt) return true;
-      return (now - new Date(p.lastReviewedAt).getTime()) > 14 * 24 * 60 * 60 * 1000;
-    }
-    if (reviewedFilter === "Recently Reviewed") {
-      if (!p.lastReviewedAt) return false;
-      return (now - new Date(p.lastReviewedAt).getTime()) <= 7 * 24 * 60 * 60 * 1000;
-    }
-    return true;
-  }
 
   const filtered = sortProjects(projects).filter((p) => {
     if (activePill !== "All" && p.status !== activePill) return false;
@@ -569,7 +543,6 @@ export default function Dashboard() {
     if (playFilter !== "All" && p.playStatus !== playFilter) return false;
     if (chainFilter !== "All" && !p.chain.includes(chainFilter)) return false;
     if (timingFilter !== "All" && p.timingWindow !== timingFilter) return false;
-    if (!passesReviewedFilter(p)) return false;
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -629,6 +602,10 @@ export default function Dashboard() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, paddingTop: 2 }}>
+            <button type="button" onClick={() => setLocation("/add")} data-testid="btn-add"
+              style={{ width: 36, height: 36, borderRadius: "50%", background: ACCENT, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+              <Plus size={18} />
+            </button>
             <button type="button" onClick={() => setShowSettings(true)} data-testid="btn-settings"
               style={{ width: 36, height: 36, borderRadius: "50%", background: SURF_RAISED, border: `1px solid ${BORDER}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_MUTED }}>
               <Settings size={15} />
@@ -689,19 +666,14 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {/* Row 3: Timing + Reviewed (Part 3A) */}
+          {/* Row 3: Timing (half width) */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-            {[
-              { value: timingFilter,   onChange: setTimingFilter,   testId: "filter-timing",   opts: [["All","All Timing"],["Now","Now"],["This Week","This Week"],["Monitor","Monitor"],["No Rush","No Rush"]] },
-              { value: reviewedFilter, onChange: setReviewedFilter, testId: "filter-reviewed", opts: [["All","All Reviewed"],["Never Reviewed","Never Reviewed"],["Not reviewed > 7d","Not reviewed > 7d"],["Not reviewed > 14d","Not reviewed > 14d"],["Recently Reviewed","Recently Reviewed"]] },
-            ].map((f) => (
-              <div key={f.testId} style={{ position: "relative" }}>
-                <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={dropStyle(f.value !== "All")}>
-                  {f.opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-                <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
-              </div>
-            ))}
+            <div style={{ position: "relative" }}>
+              <select value={timingFilter} onChange={(e) => setTimingFilter(e.target.value)} data-testid="filter-timing" style={dropStyle(timingFilter !== "All")}>
+                {[["All","All Timing"],["Now","Now"],["This Week","This Week"],["Monitor","Monitor"],["No Rush","No Rush"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+              <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
+            </div>
           </div>
         </div>
       </div>

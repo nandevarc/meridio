@@ -1,0 +1,141 @@
+You are doing a final stabilization pass on Alpha Track.
+Goal: create a clean, stable, working baseline.
+
+DO NOT add any new features.
+DO NOT redesign any UI.
+DO NOT rewrite the project.
+Read the full codebase first, then apply only what 
+is described below.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TASK 1 — AUDIT AND CLEAN VITE CONFIG
+
+Open vite.config.ts.
+
+Remove any plugin that is:
+- debug/overlay related (e.g. replit runtime error 
+  overlay, cartographer, or similar Replit-specific 
+  dev plugins)
+- no longer referenced anywhere in the codebase
+- causing console warnings or errors on startup
+
+Keep only what is genuinely needed:
+- react() plugin
+- path aliases if used
+- tailwindcss config if present
+
+After cleanup, verify: npm run dev starts without 
+config warnings.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TASK 2 — DEPENDENCY AUDIT
+
+Open package.json in artifacts/alpha-track.
+
+Identify and remove packages that are:
+- installed but never imported anywhere in src/
+- leftover from previous agent sessions
+- duplicate functionality 
+  (e.g. two animation libraries, two date libraries)
+
+Do NOT remove:
+- react, react-dom, vite
+- tailwindcss, tailwind-merge, clsx
+- shadcn/ui radix packages (@radix-ui/*)
+- lucide-react
+- uuid
+- wouter (routing)
+- react-hook-form, zod
+- date-fns
+
+After identifying unused packages, list them 
+and remove from package.json.
+Run: npm install after removal to verify 
+no broken imports.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TASK 3 — REMOVE DEAD CODE AND LEFTOVER FILES
+
+Check for and delete:
+- QuickAddModal.tsx if it still exists and 
+  is no longer used
+- duplicateDetection.ts in lib/ if it exists
+- Any .tsx/.ts file in components/ or pages/ 
+  that is not imported anywhere
+- Any commented-out blocks longer than 10 lines
+
+Do NOT delete:
+- Dashboard.tsx
+- AddProject.tsx
+- EditProject.tsx
+- DetailProject.tsx
+- storage.ts / utils/storage.ts
+- types.ts
+- projectFactory.ts (if exists)
+- exportImport.ts (if exists)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TASK 4 — RUNTIME STABILITY CHECK
+
+Verify these work without errors:
+
+1. App loads on npm run dev — no blank screen
+2. Dashboard renders project list correctly
+3. + button navigates to AddProject form
+4. AddProject form can save a new project
+5. Project card expands and collapses
+6. Edit project loads existing data correctly
+7. Simpan button saves without errors
+8. Detail page loads for a project
+9. Settings: Backup Data (JSON) downloads a file
+10. Settings: Hapus Semua Data clears and 
+    dashboard shows empty state
+
+If any of these fail, fix the root cause.
+Do not patch symptoms.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TASK 5 — DASHBOARD QUICK CLEANUP
+
+While in Dashboard.tsx, do these small fixes only:
+
+- Remove diamond icon ◆ from stats row 
+  and anywhere in card headers
+- Stats row: "[n] total · [n] active · [n] watch"
+- Remove "All Reviewed" dropdown if still present
+- Filter grid: 5 dropdowns, Row 3 = All Timing 
+  at half width only
+- Remove any "Mode Cepat" toggle from AddProject
+  header if still present
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TASK 6 — GITHUB SYNC
+
+After all tasks complete and app is verified working:
+
+git add .
+git commit -m "stabilization: safe baseline cleanup"
+git push origin main
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STRICT RULES
+
+- No new features
+- No UI redesign
+- No schema changes
+- No routing changes
+- Fix only what is broken or redundant
+- Every change must have a clear reason
+
+After completing, provide:
+1. Files modified
+2. Files deleted
+3. Packages removed
+4. Confirmation app runs without errors
