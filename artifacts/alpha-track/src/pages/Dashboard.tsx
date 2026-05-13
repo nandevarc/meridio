@@ -632,7 +632,7 @@ export default function Dashboard() {
             <button type="button" onClick={() => setShowSettings(true)} data-testid="btn-settings"
               style={{ width: 36, height: 36, borderRadius: "50%", background: SURF_RAISED, border: `1px solid ${BORDER}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_MUTED }}>
               <Settings size={15} />
-            </butto>
+            </button>
           </div>
         </div>
 
