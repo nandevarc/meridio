@@ -7,7 +7,6 @@ import {
 import type { ProjectLinks, ProjectCT, ProjectScores } from "../types/project";
 import { createEmptyProject } from "../lib/projectFactory";
 import { saveProject } from "../lib/storage";
-import { checkDuplicate, type DuplicateResult } from "../lib/duplicateDetection";
 import { useToast } from "../context/ToastContext";
 import { TagInput, MultiSelectTags } from "../components/TagInput";
 import { Field, TextInput, TextArea, Select } from "../components/FormFields";
@@ -96,31 +95,6 @@ const dateInputStyle: React.CSSProperties = {
   height: 40, boxSizing: "border-box",
 };
 
-// ── Duplicate warning ────────────────────────────────────────────
-
-interface DupWarningProps {
-  dup: DuplicateResult;
-  onSaveAnyway: () => void;
-  onCancel: () => void;
-}
-
-function DupWarning({ dup, onSaveAnyway, onCancel }: DupWarningProps) {
-  return (
-    <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: "12px 16px", marginBottom: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-        <span style={{ color: "#F59E0B", fontSize: 14 }}>⚠</span>
-        <span style={{ fontSize: 14, fontWeight: 600, color: "#92400E" }}>Possible duplicate found</span>
-      </div>
-      <div style={{ fontSize: 12, color: "#B45309", marginBottom: 10 }}>
-        "{dup.matchedProject.name}" on {dup.matchedProject.chain.join(", ")} already exists. Save anyway?
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button type="button" onClick={onSaveAnyway} style={{ background: "#F59E0B", color: "#fff", height: 32, padding: "0 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer" }}>Save anyway</button>
-        <button type="button" onClick={onCancel} style={{ background: "#fff", color: "#B45309", border: "1px solid #FDE68A", height: 32, padding: "0 16px", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
-      </div>
-    </div>
-  );
-}
 
 // ── Page ─────────────────────────────────────────────────────────
 
@@ -140,11 +114,8 @@ export default function AddProject() {
     return prefillName ? { ...base, name: prefillName } : base;
   });
 
-  const [duplicate, setDuplicate] = useState<DuplicateResult | null>(null);
-
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
-    setDuplicate(null);
   }
   function setLink(key: keyof ProjectLinks, value: string) {
     setForm((prev) => ({ ...prev, links: { ...prev.links, [key]: value } }));
@@ -164,10 +135,6 @@ export default function AddProject() {
 
   function handleSave(force = false) {
     if (!form.name.trim()) { alert("Nama project wajib diisi."); return; }
-    if (!force) {
-      const dup = checkDuplicate(form.name, form.chain, form.id);
-      if (dup) { setDuplicate(dup); return; }
-    }
     doSave();
   }
 
@@ -301,13 +268,6 @@ export default function AddProject() {
 
       {/* Sticky bottom bar */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: SURFACE, borderTop: `1px solid ${BORDER}`, padding: "12px 16px 20px", zIndex: 30, maxWidth: 480, margin: "0 auto", boxSizing: "border-box", width: "100%", boxShadow: "0 -2px 8px rgba(0,0,0,0.06)" }}>
-        {duplicate && (
-          <DupWarning
-            dup={duplicate}
-            onSaveAnyway={() => doSave()}
-            onCancel={() => setDuplicate(null)}
-          />
-        )}
         <button type="button" onClick={() => handleSave(false)} data-testid="btn-simpan" style={{ width: "100%", height: 48, background: ACCENT, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontFamily: "'Inter', sans-serif", fontWeight: 600, cursor: "pointer", boxShadow: "0 2px 8px rgba(75,124,111,0.25)" }}>Simpan</button>
         <div style={{ textAlign: "center", marginTop: 10 }}>
           <button type="button" onClick={() => setLocation("/")} data-testid="btn-batal" style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, fontSize: 13 }}>Batal</button>
