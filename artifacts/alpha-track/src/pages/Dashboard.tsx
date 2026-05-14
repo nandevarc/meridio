@@ -8,7 +8,8 @@ import {
 import type { PlayStatus } from "../types/project";
 import { getProjects, updateProject, deleteProject } from "../utils/storage";
 import { getAllProjects, saveAllProjects } from "../lib/storage";
-import { exportBackup, importBackup } from "../lib/exportImport";
+import { exportBackup, validateBackupFile } from "../lib/exportImport";
+import type { ValidationResult } from "../lib/exportImport";
 import { useToast } from "../context/ToastContext";
 import { Settings, Plus, ChevronDown, ChevronUp, ExternalLink, Search } from "lucide-react";
 
@@ -445,51 +446,184 @@ const settingBtnStyle: React.CSSProperties = {
   cursor: "pointer", fontFamily: "'Inter', sans-serif", textAlign: "left",
 };
 
-function SettingsSheet({ onClose }: { onClose: () => void }) {
+function SettingsSheet({ onClose, onProjectsChanged }: { onClose: () => void; onProjectsChanged: () => void }) {
   const { showToast } = useToast();
-  const [confirmClear, setConfirmClear] = useState(false);
+
+  // ── Restore state ─────────────────────────────────────────────
+  const [restoreResult, setRestoreResult] = useState<ValidationResult | null>(null);
+
+  // ── Delete state ──────────────────────────────────────────────
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
 
   function handleBackup() {
     exportBackup(getAllProjects());
     showToast("backup berhasil");
     onClose();
   }
-  function handleRestore() {
+
+  function handleRestoreSelect() {
     const input = document.createElement("input");
-    input.type = "file"; input.accept = ".json";
+    input.type = "file";
+    input.accept = ".json";
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      importBackup(file, (projects) => { saveAllProjects(projects); showToast(`data diimport · ${projects.length} project`); onClose(); window.location.reload(); }, (msg) => alert(msg));
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const parsed = JSON.parse(ev.target?.result as string);
+          const result = validateBackupFile(parsed);
+          setRestoreResult(result);
+        } catch {
+          setRestoreResult({ valid: false, error: "File tidak valid: gagal membaca JSON." });
+        }
+      };
+      reader.readAsText(file);
     };
     input.click();
   }
-  function handleClearAll() {
-    if (!confirmClear) { setConfirmClear(true); return; }
+
+  function handleConfirmRestore() {
+    if (!restoreResult?.projects) return;
+    saveAllProjects(restoreResult.projects);
+    showToast(`data diimport · ${restoreResult.count} project`);
+    setRestoreResult(null);
+    onProjectsChanged();
+    onClose();
+  }
+
+  function handleConfirmDelete() {
     saveAllProjects([]);
     showToast("semua data dihapus");
+    setShowDeleteConfirm(false);
+    setDeleteInput("");
+    onProjectsChanged();
     onClose();
-    window.location.reload();
   }
+
+  // ── Format exportedAt for display ─────────────────────────────
+  function formatExportedAt(iso: string | null | undefined): string {
+    if (!iso) return "tanggal tidak diketahui";
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+    } catch {
+      return iso;
+    }
+  }
+
   return (
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 100 }} />
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: "16px 16px 0 0", padding: 24, zIndex: 101, maxWidth: 480, margin: "0 auto", boxShadow: "0 -4px 20px rgba(0,0,0,0.08)" }}>
         <div style={{ color: TEXT_MUTED, fontSize: 11, marginBottom: 20, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Settings</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <button type="button" onClick={handleBackup} data-testid="btn-backup" style={settingBtnStyle}>Backup Data (JSON)</button>
-          <button type="button" onClick={handleRestore} data-testid="btn-restore" style={settingBtnStyle}>Restore Data</button>
-          {!confirmClear ? (
-            <button type="button" onClick={handleClearAll} data-testid="btn-clear" style={{ ...settingBtnStyle, color: RED, fontSize: 12 }}>Hapus Semua Data</button>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <span style={{ color: TEXT_SEC, fontSize: 12 }}>Hapus semua {getAllProjects().length} project?</span>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" onClick={() => setConfirmClear(false)} style={settingBtnStyle}>Batal</button>
-                <button type="button" onClick={handleClearAll} data-testid="btn-confirm-clear" style={{ ...settingBtnStyle, background: RED_LIGHT, color: RED, border: `1px solid ${RED_BORD}` }}>Hapus Semua</button>
+
+          {/* ── Backup ────────────────────────────────────────── */}
+          <button type="button" onClick={handleBackup} data-testid="btn-backup" style={settingBtnStyle}>
+            Backup Data (JSON)
+          </button>
+
+          {/* ── Restore ───────────────────────────────────────── */}
+          <button type="button" onClick={handleRestoreSelect} data-testid="btn-restore" style={settingBtnStyle}>
+            Restore Data
+          </button>
+
+          {/* Restore: error state */}
+          {restoreResult && !restoreResult.valid && (
+            <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "12px 16px" }}>
+              <span style={{ fontSize: 13, color: "#B91C1C" }}>
+                ⚠ Gagal import: {restoreResult.error}
+              </span>
+            </div>
+          )}
+
+          {/* Restore: preview confirmation */}
+          {restoreResult && restoreResult.valid && (
+            <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 12, padding: "12px 16px" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#1E40AF" }}>Konfirmasi Restore</div>
+              <div style={{ fontSize: 12, color: "#1D4ED8", marginTop: 4, lineHeight: 1.6 }}>
+                Backup ini berisi <strong>{restoreResult.count} project</strong>, dibuat {formatExportedAt(restoreResult.exportedAt)}.
+                <br />Data yang ada sekarang akan diganti. Lanjutkan?
+              </div>
+              {restoreResult.version && restoreResult.version !== "2" && (
+                <div style={{ fontSize: 11, color: "#D97706", marginTop: 4 }}>
+                  ⚠ Backup ini dibuat dengan versi lama. Beberapa field mungkin tidak kompatibel.
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={handleConfirmRestore}
+                  data-testid="btn-confirm-restore"
+                  style={{ height: 32, padding: "0 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", background: "#2563EB", color: "#fff", border: "none" }}
+                >
+                  Ya, Restore Sekarang
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRestoreResult(null)}
+                  style={{ height: 32, padding: "0 16px", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", background: "#fff", color: "#1D4ED8", border: "1px solid #BFDBFE" }}
+                >
+                  Batal
+                </button>
               </div>
             </div>
           )}
+
+          {/* ── Delete all ────────────────────────────────────── */}
+          {!showDeleteConfirm ? (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              data-testid="btn-clear"
+              style={{ ...settingBtnStyle, color: RED, fontSize: 12 }}
+            >
+              Hapus Semua Data
+            </button>
+          ) : (
+            <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "12px 16px" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#991B1B" }}>Konfirmasi Hapus Semua Data</div>
+              <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 4, lineHeight: 1.6 }}>
+                Tindakan ini tidak bisa dibatalkan.<br />
+                Semua project akan dihapus permanen.<br /><br />
+                Ketik <strong>HAPUS</strong> untuk konfirmasi.
+              </div>
+              <input
+                type="text"
+                value={deleteInput}
+                onChange={(e) => setDeleteInput(e.target.value)}
+                placeholder="Ketik HAPUS di sini"
+                data-testid="input-delete-confirm"
+                style={{ width: "100%", height: 36, marginTop: 8, borderRadius: 8, border: "1px solid #FECACA", padding: "0 12px", fontSize: 13, fontFamily: "'Inter', sans-serif", background: "#fff", outline: "none", boxSizing: "border-box" }}
+              />
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={deleteInput !== "HAPUS"}
+                  data-testid="btn-confirm-clear"
+                  style={{
+                    height: 32, padding: "0 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none",
+                    background: deleteInput === "HAPUS" ? "#DC2626" : "#FECACA",
+                    color: deleteInput === "HAPUS" ? "#fff" : "#F87171",
+                    cursor: deleteInput === "HAPUS" ? "pointer" : "not-allowed",
+                  }}
+                >
+                  Hapus Semua
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowDeleteConfirm(false); setDeleteInput(""); }}
+                  style={{ height: 32, padding: "0 16px", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", background: "#fff", color: "#B91C1C", border: "1px solid #FECACA" }}
+                >
+                  Batal
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </>
@@ -701,7 +835,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} />}
+      {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} onProjectsChanged={load} />}
 
     </div>
   );

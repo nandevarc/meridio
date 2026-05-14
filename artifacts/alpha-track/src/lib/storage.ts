@@ -8,14 +8,28 @@ export function getAllProjects(): Project[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as Project[];
-  } catch {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed as Project[];
+  } catch (error) {
+    console.error('Alpha Track: localStorage parse error, returning empty array', error);
     return [];
   }
 }
 
 export function saveAllProjects(projects: Project[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+    localStorage.setItem(
+      STORAGE_KEY + '_autobak',
+      JSON.stringify({
+        savedAt: new Date().toISOString(),
+        projects,
+      })
+    );
+  } catch (error) {
+    console.error('Alpha Track: failed to save to localStorage', error);
+  }
 }
 
 export function getProjectById(id: string): Project | null {
