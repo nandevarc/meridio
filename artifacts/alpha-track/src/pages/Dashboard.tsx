@@ -11,19 +11,19 @@ import { getAllProjects, saveAllProjects } from "../lib/storage";
 import { exportBackup, validateBackupFile } from "../lib/exportImport";
 import type { ValidationResult } from "../lib/exportImport";
 import { useToast } from "../context/ToastContext";
-import { Settings, Plus, ChevronDown, ChevronUp, ExternalLink, Search } from "lucide-react";
+import { Settings, Plus, ChevronDown, ChevronUp, ExternalLink, Search, SlidersHorizontal } from "lucide-react";
 
 // ── Design tokens ─────────────────────────────────────────────────
 const ACCENT       = "#4B7C6F";
 const ACCENT_LIGHT = "#EBF4F1";
 const ACCENT_BORD  = "#A7D9CE";
-const BORDER       = "#D1D5DB";
-const BORDER_SUB   = "#E5E7EB";
+const BORDER       = "#E2E8F0";
+const BORDER_SUB   = "#F1F5F9";
 const SURFACE      = "#FFFFFF";
-const SURF_RAISED  = "#F3F4F6";
-const TEXT_PRI     = "#111827";
-const TEXT_SEC     = "#4B5563";
-const TEXT_MUTED   = "#6B7280";
+const SURF_RAISED  = "#F1F5F9";
+const TEXT_PRI     = "#0F172A";
+const TEXT_SEC     = "#475569";
+const TEXT_MUTED   = "#94A3B8";
 const RED          = "#DC2626";
 const RED_LIGHT    = "#FEF2F2";
 const RED_BORD     = "#FECACA";
@@ -205,13 +205,35 @@ function ProjectCard({ project, onStatusChange, onDelete, isNew }: CardProps) {
       {/* ── Collapsed area ───────────────────────────────────── */}
       <div onClick={() => setExpanded((e) => !e)} style={{ padding: "12px 12px 10px", cursor: "pointer", userSelect: "none" }}>
 
-        {/* Row 1 */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, gap: 6 }}>
+        {/* Line A — dot + name | chevron + status */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
             <div
               className={isActiveHigh ? "pulse-red" : ""}
               style={{ width: 8, height: 8, borderRadius: "50%", background: priorityColor, flexShrink: 0 }}
             />
+            <span style={{ color: nameColor, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+              {project.name}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <span style={{ color: TEXT_MUTED, display: "flex", alignItems: "center", transform: expanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 150ms ease" }}>
+              <ChevronDown size={13} />
+            </span>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onStatusChange(project.id, cycleStatus(project.status)); }}
+              data-testid={`status-badge-${project.id}`}
+              style={{ background: statusStyle.bg, color: statusStyle.text, border: `1px solid ${statusStyle.border}`, borderRadius: 999, padding: "3px 10px", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}
+            >
+              {project.status}
+            </button>
+          </div>
+        </div>
+
+        {/* Line B — timing badge + verdict badge */}
+        {(project.timingWindow || (project.verdict && VERDICT_STYLES[project.verdict])) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
             {project.timingWindow && TIMING_BADGE[project.timingWindow] && (
               <span
                 className={project.timingWindow === "Now" ? "pulse-red" : ""}
@@ -220,42 +242,30 @@ function ProjectCard({ project, onStatusChange, onDelete, isNew }: CardProps) {
                 {project.timingWindow}
               </span>
             )}
-            <span className="syne" style={{ color: nameColor, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1 }}>
-              {project.name}
-            </span>
             {project.verdict && VERDICT_STYLES[project.verdict] && (
               <span style={{ background: VERDICT_STYLES[project.verdict].bg, color: VERDICT_STYLES[project.verdict].text, border: `1px solid ${VERDICT_STYLES[project.verdict].border}`, borderRadius: 999, padding: "2px 7px", fontSize: 10, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap" }}>
                 {project.verdict}
               </span>
             )}
           </div>
-          <span style={{ color: TEXT_MUTED, flexShrink: 0, marginRight: 4, display: "flex", alignItems: "center", transform: expanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 150ms ease" }}>
-            <ChevronDown size={13} />
-          </span>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onStatusChange(project.id, cycleStatus(project.status)); }}
-            data-testid={`status-badge-${project.id}`}
-            style={{ background: statusStyle.bg, color: statusStyle.text, border: `1px solid ${statusStyle.border}`, borderRadius: 999, padding: "3px 10px", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
-          >
-            {project.status}
-          </button>
-        </div>
-
-        {/* Row 2 — tags */}
-        {(project.chain.length > 0 || project.category.length > 0 || project.stage.length > 0) && (
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
-            {project.chain.map((c) => (
-              <span key={c} style={{ background: SURF_RAISED, color: TEXT_SEC, border: `1px solid ${BORDER_SUB}`, borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 500 }}>{c}</span>
-            ))}
-            {project.category.map((c) => (
-              <span key={c} style={{ background: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 500 }}>{c}</span>
-            ))}
-            {project.stage.map((s) => (
-              <span key={s} style={{ background: SURF_RAISED, color: TEXT_SEC, border: `1px solid ${BORDER_SUB}`, borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 500 }}>{s}</span>
-            ))}
-          </div>
         )}
+
+        {/* Tags — max 3 in collapsed, all in expanded */}
+        {(project.chain.length > 0 || project.category.length > 0 || project.stage.length > 0) && (() => {
+          const allTags = [...project.chain, ...project.category, ...project.stage];
+          const visibleTags = expanded ? allTags : allTags.slice(0, 3);
+          const overflowCount = expanded ? 0 : Math.max(0, allTags.length - 3);
+          return (
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+              {visibleTags.map((tag) => (
+                <span key={tag} style={{ background: "#F1F5F9", color: "#475569", border: "1px solid #E2E8F0", borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 500 }}>{tag}</span>
+              ))}
+              {overflowCount > 0 && (
+                <span style={{ fontSize: 10, color: "#94A3B8", fontWeight: 500 }}>+{overflowCount}</span>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Row 3 — CT + play badge + score */}
         {(showCTRow || showPlayBadge || qs !== null) && (
@@ -642,6 +652,7 @@ export default function Dashboard() {
   const [timingFilter, setTimingFilter]   = useState("All");
   const [activePill, setActivePill]       = useState("All");
   const [showSettings, setShowSettings]   = useState(false);
+  const [filterOpen, setFilterOpen]       = useState(false);
   const [, setLocation]                   = useLocation();
   const { showToast }                     = useToast();
 
@@ -649,10 +660,35 @@ export default function Dashboard() {
 
   useEffect(() => {
     load();
+    // Load persisted filters
+    try {
+      const saved = localStorage.getItem('meridio_filters');
+      if (saved) {
+        const f = JSON.parse(saved);
+        if (f.status)   setStatusFilter(f.status);
+        if (f.priority) setPriorityFilter(f.priority);
+        if (f.play)     setPlayFilter(f.play);
+        if (f.chain)    setChainFilter(f.chain);
+        if (f.timing)   setTimingFilter(f.timing);
+      }
+    } catch {}
     const handler = () => load();
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
   }, [load]);
+
+  // Persist filters on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem('meridio_filters', JSON.stringify({
+        status: statusFilter,
+        priority: priorityFilter,
+        play: playFilter,
+        chain: chainFilter,
+        timing: timingFilter,
+      }));
+    } catch {}
+  }, [statusFilter, priorityFilter, playFilter, chainFilter, timingFilter]);
 
   function handleStatusChange(id: string, newStatus: ProjectStatus) {
     const project = projects.find((p) => p.id === id);
@@ -705,6 +741,14 @@ export default function Dashboard() {
   const activeCount = projects.filter((p) => p.status === "Active Play").length;
   const watchCount  = projects.filter((p) => p.status === "Watchlist").length;
 
+  const activeFilterCount = [
+    statusFilter !== "All",
+    priorityFilter !== "All",
+    playFilter !== "All",
+    chainFilter !== "All",
+    timingFilter !== "All",
+  ].filter(Boolean).length;
+
   // Active filter style for dropdowns
   function dropStyle(isActive: boolean): React.CSSProperties {
     return {
@@ -720,7 +764,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div style={{ background: "#FAFAFA", minHeight: "100vh" }}>
+    <div style={{ background: "#F8F9FA", minHeight: "100vh" }}>
       {/* ── Sticky header ─────────────────────────────────────── */}
       <div style={{ position: "sticky", top: 0, zIndex: 30, background: SURFACE, borderBottom: `1px solid ${BORDER}`, padding: "8px 16px 0", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
 
@@ -749,14 +793,14 @@ export default function Dashboard() {
         </div>
 
         {/* Status pills */}
-        <div className="hide-scrollbar" style={{ overflowX: "auto", display: "flex", gap: 6, paddingBottom: 8, paddingTop: 6 }}>
+        <div className="hide-scrollbar" style={{ overflowX: "auto", display: "flex", gap: 6, paddingBottom: 10, paddingTop: 10 }}>
           {statusPills.map((pill) => {
             const isActive = activePill === pill;
             return (
               <button key={pill} type="button" onClick={() => { setActivePill(pill); setStatusFilter("All"); }} data-testid={`pill-${pill}`}
-                style={{ background: isActive ? ACCENT : SURF_RAISED, color: isActive ? "#fff" : TEXT_SEC, border: isActive ? "1px solid transparent" : `1px solid ${BORDER}`, borderRadius: 999, padding: "4px 10px", fontSize: 12, fontWeight: isActive ? 600 : 500, cursor: "pointer", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}>
+                style={{ background: isActive ? ACCENT : "#F1F5F9", color: isActive ? "#fff" : "#475569", border: isActive ? "1px solid transparent" : "1px solid #E2E8F0", borderRadius: 999, padding: "6px 12px", fontSize: 12, fontWeight: isActive ? 600 : 500, cursor: "pointer", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}>
                 {pill}
-                <span style={{ fontSize: 10, opacity: 0.75 }}>{counts[pill] ?? 0}</span>
+                <span style={{ fontSize: 10, opacity: 0.7 }}>{counts[pill] ?? 0}</span>
               </button>
             );
           })}
@@ -764,50 +808,66 @@ export default function Dashboard() {
 
         {/* Filter bar */}
         <div style={{ paddingBottom: 8, display: "flex", flexDirection: "column", gap: 6, marginBottom: 2 }}>
-          {/* Search */}
-          <div style={{ position: "relative" }}>
-            <Search size={14} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#9CA3AF", pointerEvents: "none" }} />
-            <input type="search" placeholder="search name, chain, category, verdict..." value={search} onChange={(e) => setSearch(e.target.value)} onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)} data-testid="input-search"
-              style={{ width: "100%", background: SURFACE, border: `1px solid ${searchFocused ? ACCENT : BORDER}`, borderRadius: 8, height: 36, paddingLeft: 32, paddingRight: 12, color: TEXT_PRI, fontSize: 13, fontFamily: "'Inter', sans-serif", outline: "none", boxSizing: "border-box", boxShadow: searchFocused ? `0 0 0 3px ${ACCENT_LIGHT}` : "none" }} />
+          {/* Search row + filter toggle */}
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div style={{ position: "relative", flex: 1 }}>
+              <Search size={14} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#9CA3AF", pointerEvents: "none" }} />
+              <input type="search" placeholder="search name, chain, category, verdict..." value={search} onChange={(e) => setSearch(e.target.value)} onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)} data-testid="input-search"
+                style={{ width: "100%", background: SURFACE, border: `1px solid ${searchFocused ? ACCENT : BORDER}`, borderRadius: 8, height: 36, paddingLeft: 32, paddingRight: 12, color: TEXT_PRI, fontSize: 13, fontFamily: "'Inter', sans-serif", outline: "none", boxSizing: "border-box", boxShadow: searchFocused ? `0 0 0 3px ${ACCENT_LIGHT}` : "none" }} />
+            </div>
+            <button
+              type="button"
+              onClick={() => setFilterOpen((v) => !v)}
+              data-testid="btn-filter-toggle"
+              style={{ height: 36, padding: "0 12px", borderRadius: 8, fontSize: 12, fontWeight: activeFilterCount > 0 ? 600 : 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, background: activeFilterCount > 0 ? ACCENT_LIGHT : SURFACE, border: `1px solid ${activeFilterCount > 0 ? ACCENT_BORD : BORDER}`, color: activeFilterCount > 0 ? ACCENT : TEXT_SEC, whiteSpace: "nowrap" }}
+            >
+              <SlidersHorizontal size={13} />
+              {activeFilterCount > 0 ? `Filter · ${activeFilterCount}` : "Filter"}
+            </button>
           </div>
 
-          {/* Row 1: Status + Priority */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-            {[
-              { value: statusFilter,   onChange: setStatusFilter,   testId: "filter-status",   opts: [["All","All Status"], ...STATUS_ORDER.map(s => [s,s])] },
-              { value: priorityFilter, onChange: setPriorityFilter, testId: "filter-priority", opts: [["All","All Priority"],["High","High"],["Medium","Medium"],["Low","Low"]] },
-            ].map((f) => (
-              <div key={f.testId} style={{ position: "relative" }}>
-                <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={dropStyle(f.value !== "All")}>
-                  {f.opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-                <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
+          {/* Collapsible filter grid */}
+          <div style={{ maxHeight: filterOpen ? 220 : 0, overflow: "hidden", transition: "max-height 200ms ease-in-out" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 2 }}>
+              {/* Row 1: Status + Priority */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                {[
+                  { value: statusFilter,   onChange: setStatusFilter,   testId: "filter-status",   opts: [["All","All Status"], ...STATUS_ORDER.map(s => [s,s])] },
+                  { value: priorityFilter, onChange: setPriorityFilter, testId: "filter-priority", opts: [["All","All Priority"],["High","High"],["Medium","Medium"],["Low","Low"]] },
+                ].map((f) => (
+                  <div key={f.testId} style={{ position: "relative" }}>
+                    <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={dropStyle(f.value !== "All")}>
+                      {f.opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                    <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          {/* Row 2: Play + Chain */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-            {[
-              { value: playFilter,  onChange: setPlayFilter,  testId: "filter-play",  opts: [["All","All Play"],["Belum Ada","Belum Ada"],["Aktif","Aktif"],["Selesai","Selesai"],["Skip","Skip"]] },
-              { value: chainFilter, onChange: setChainFilter, testId: "filter-chain", opts: [["All","All Chain"], ...allChains.map(c => [c,c])] },
-            ].map((f) => (
-              <div key={f.testId} style={{ position: "relative" }}>
-                <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={dropStyle(f.value !== "All")}>
-                  {f.opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-                <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
+              {/* Row 2: Play + Chain */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                {[
+                  { value: playFilter,  onChange: setPlayFilter,  testId: "filter-play",  opts: [["All","All Play"],["Belum Ada","Belum Ada"],["Aktif","Aktif"],["Selesai","Selesai"],["Skip","Skip"]] },
+                  { value: chainFilter, onChange: setChainFilter, testId: "filter-chain", opts: [["All","All Chain"], ...allChains.map(c => [c,c])] },
+                ].map((f) => (
+                  <div key={f.testId} style={{ position: "relative" }}>
+                    <select value={f.value} onChange={(e) => f.onChange(e.target.value)} data-testid={f.testId} style={dropStyle(f.value !== "All")}>
+                      {f.opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                    <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          {/* Row 3: Timing (half width) */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-            <div style={{ position: "relative" }}>
-              <select value={timingFilter} onChange={(e) => setTimingFilter(e.target.value)} data-testid="filter-timing" style={dropStyle(timingFilter !== "All")}>
-                {[["All","All Timing"],["Now","Now"],["This Week","This Week"],["Monitor","Monitor"],["No Rush","No Rush"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-              <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
+              {/* Row 3: Timing (half width) */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                <div style={{ position: "relative" }}>
+                  <select value={timingFilter} onChange={(e) => setTimingFilter(e.target.value)} data-testid="filter-timing" style={dropStyle(timingFilter !== "All")}>
+                    {[["All","All Timing"],["Now","Now"],["This Week","This Week"],["Monitor","Monitor"],["No Rush","No Rush"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                  <ChevronDown size={10} style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", color: TEXT_MUTED, pointerEvents: "none" }} />
+                </div>
+              </div>
             </div>
           </div>
         </div>
