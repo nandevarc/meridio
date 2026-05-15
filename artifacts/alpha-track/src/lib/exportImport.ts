@@ -57,7 +57,7 @@ export function exportBackup(projects: Project[]): void {
   const url = URL.createObjectURL(blob);
   const a   = document.createElement('a');
   a.href     = url;
-  a.download = `alphatrack-backup-${dateStr}.json`;
+  a.download = `meridio-backup-${dateStr}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }

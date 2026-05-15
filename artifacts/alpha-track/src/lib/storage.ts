@@ -12,7 +12,7 @@ export function getAllProjects(): Project[] {
     if (!Array.isArray(parsed)) return [];
     return parsed as Project[];
   } catch (error) {
-    console.error('Alpha Track: localStorage parse error, returning empty array', error);
+    console.error('Meridio: localStorage parse error, returning empty array', error);
     return [];
   }
 }
@@ -28,7 +28,7 @@ export function saveAllProjects(projects: Project[]): void {
       })
     );
   } catch (error) {
-    console.error('Alpha Track: failed to save to localStorage', error);
+    console.error('Meridio: failed to save to localStorage', error);
   }
 }
 

@@ -726,9 +726,10 @@ export default function Dashboard() {
 
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           <div>
-            <div className="syne" style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
-              <span style={{ color: TEXT_PRI }}>ALPHA</span>
-              <span style={{ color: RED }}>TRACK</span>
+            <div>
+              <span style={{ fontFamily: "'Geist Sans', sans-serif", fontWeight: 500, fontSize: '17px', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#0F172A' }}>
+                MERIDIO
+              </span>
             </div>
             {/* Part 0: Stats row — total · active · watch ONLY */}
             <div style={{ color: TEXT_MUTED, fontSize: 11, marginTop: 2 }}>
